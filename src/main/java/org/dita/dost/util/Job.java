@@ -84,6 +84,7 @@ public final class Job {
     private static final String ATTRIBUTE_CHUNKED_DITAMAP_LIST = "chunked-ditamap";
     private static final String ATTRIBUTE_FLAG_IMAGE_LIST = "flag-image";
     private static final String ATTRIBUTE_SUBSIDIARY_TARGET_LIST = "subtarget";
+    private static final String ATTRIBUTE_FILTERED = "filtered";
 
     private static final String PROPERTY_OUTER_CONTROL = ANT_INVOKER_EXT_PARAM_OUTTERCONTROL;
     private static final String PROPERTY_ONLY_TOPIC_IN_MAP = ANT_INVOKER_EXT_PARAM_ONLYTOPICINMAP;
@@ -119,6 +120,7 @@ public final class Job {
             attrToFieldMap.put(ATTRIBUTE_OUT_DITA_FILES_LIST, FileInfo.class.getField("isOutDita"));
             attrToFieldMap.put(ATTRIBUTE_FLAG_IMAGE_LIST, FileInfo.class.getField("isFlagImage"));
             attrToFieldMap.put(ATTRIBUTE_SUBSIDIARY_TARGET_LIST, FileInfo.class.getField("isSubtarget"));
+            attrToFieldMap.put(ATTRIBUTE_FILTERED, FileInfo.class.getField("isFiltered"));
         } catch (final NoSuchFieldException e) {
             throw new RuntimeException(e);
         }
@@ -649,6 +651,8 @@ public final class Job {
         public boolean isInput;
         /** Additional input resource. */
         public boolean isInputResource;
+        /** True, if the whole file is filtered by a profiling attribute */
+        public boolean isFiltered;
 
         FileInfo(final URI src, final URI uri, final File file) {
             if (uri == null && file == null) throw new IllegalArgumentException(new NullPointerException());
@@ -687,6 +691,7 @@ public final class Job {
                     ", isSubtarget=" + isSubtarget +
                     ", isFlagImage=" + isFlagImage +
                     ", isOutDita=" + isOutDita +
+                    ", isFiltered=" + isFiltered +
                     '}';
         }
 
@@ -709,6 +714,7 @@ public final class Job {
                     isOutDita == fileInfo.isOutDita &&
                     isInput == fileInfo.isInput &&
                     isInputResource == fileInfo.isInputResource &&
+                    isFiltered == fileInfo.isFiltered &&
                     Objects.equals(src, fileInfo.src) &&
                     Objects.equals(uri, fileInfo.uri) &&
                     Objects.equals(file, fileInfo.file) &&
@@ -720,7 +726,7 @@ public final class Job {
         public int hashCode() {
             return Objects.hash(src, uri, file, result, format, hasConref, isChunked, hasLink, isResourceOnly, isTarget,
                     isConrefPush, hasKeyref, hasCoderef, isSubjectScheme, isSubtarget, isFlagImage, isOutDita, isInput,
-                    isInputResource);
+                    isInputResource, isFiltered);
         }
 
         public static Builder builder() {
@@ -752,6 +758,7 @@ public final class Job {
             private boolean isOutDita;
             private boolean isInput;
             private boolean isInputResource;
+            private boolean isFiltered;
 
             public Builder() {}
             public Builder(final FileInfo orig) {
@@ -774,6 +781,7 @@ public final class Job {
                 isOutDita = orig.isOutDita;
                 isInput = orig.isInput;
                 isInputResource = orig.isInputResource;
+                isFiltered = orig.isFiltered;
             }
 
             /**
@@ -799,6 +807,7 @@ public final class Job {
                 if (orig.isOutDita) isOutDita = orig.isOutDita;
                 if (orig.isInput) isInput = orig.isInput;
                 if (orig.isInputResource) isInputResource = orig.isInputResource;
+                if (orig.isFiltered) isFiltered = orig.isFiltered;
                 return this;
             }
 
@@ -842,6 +851,7 @@ public final class Job {
             public Builder isOutDita(final boolean isOutDita) { this.isOutDita = isOutDita; return this; }
             public Builder isInput(final boolean isInput) { this.isInput = isInput; return this; }
             public Builder isInputResource(final boolean isInputResource) { this.isInputResource = isInputResource; return this; }
+            public Builder isFiltered(final boolean isFiltered) { this.isFiltered = isFiltered; return this; }
 
             public FileInfo build() {
                 if (uri == null && file == null) {
@@ -866,6 +876,7 @@ public final class Job {
                 fi.isOutDita = isOutDita;
                 fi.isInput = isInput;   
                 fi.isInputResource = isInputResource;
+                fi.isFiltered = isFiltered;
                 return fi;
             }
 
