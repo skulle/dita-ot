@@ -1,3 +1,14 @@
+#Eclipse
+bin/
+.settings/
+.project
+.classpath
+
+#IntelliJ
+.idea/
+out/
+*.iws
+
 # Gradle task artifacts & build results
 .gradle/
 build/
