@@ -953,6 +953,9 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
 
         initXMLReader(ditaDir, validate);
         initFilters();
+        if (filterUtils != null) {
+        	filterUtils.setJob(job);
+        }
     }
 
 }

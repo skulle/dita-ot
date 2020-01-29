@@ -216,6 +216,7 @@ public final class KeyrefReader implements AbstractReader {
                     final String f = copy.getAttribute(ATTRIBUTE_NAME_FORMAT);
                     final String format = f.isEmpty() ? null : f;
                     final KeyDef keyDef = new KeyDef(key, href, scope, format, currentFile, copy);
+                    keyDef.setFiltered(job.getFileInfo(href).isFiltered);
                     keyDefs.put(key, keyDef);
                 }
             }

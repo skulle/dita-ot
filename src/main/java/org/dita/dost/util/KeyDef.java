@@ -29,12 +29,14 @@ import org.w3c.dom.Element;
 public class KeyDef {
 
     public static final String ELEMENT_STUB = "stub";
+    private static final String ELEMENT_KEYDEF = "keydef";
     private static final String ATTRIBUTE_SOURCE = "source";
     private static final String ATTRIBUTE_HREF = "href";
     private static final String ATTRIBUTE_SCOPE = "scope";
     private static final String ATTRIBUTE_FORMAT = "format";
     private static final String ATTRIBUTE_KEYS = "keys";
-    private static final String ELEMENT_KEYDEF = "keydef";
+    private static final String ATTRIBUTE_FILTERED = "filtered";
+    
 
     /** Space delimited list of key names */
     public final String keys;
@@ -43,6 +45,7 @@ public class KeyDef {
     public final URI source;
     public final Element element;
     public final String format;
+    private boolean filtered;
 
     /**
      * Construct new key definition.
@@ -53,7 +56,6 @@ public class KeyDef {
      * @param source key definition source, may be {@code null}
      */
     public KeyDef(final String keys, final URI href, final String scope, final String format, final URI source, final Element element) {
-        //assert href.isAbsolute();
         this.keys = keys;
         this.href = href == null || href.toString().isEmpty() ? null : href;
         this.scope = scope == null ? ATTR_SCOPE_VALUE_LOCAL : scope;
@@ -61,6 +63,14 @@ public class KeyDef {
         this.source = source;
         this.element = element;
     }
+    
+    public void setFiltered(boolean filtered) {
+    	this.filtered = filtered;
+    }
+    
+    public boolean isFiltered() {
+		return filtered;
+	}
 
     @Override
     public String toString() {
@@ -74,6 +84,7 @@ public class KeyDef {
         if (source != null) {
             buf.append(LEFT_BRACKET).append(source.toString()).append(RIGHT_BRACKET);
         }
+        buf.append(isFiltered());
         return buf.toString();
     }
 
@@ -85,35 +96,36 @@ public class KeyDef {
      * @throws DITAOTException if writing configuration file failed
      */
     public static void writeKeydef(final File keydefFile, final Collection<KeyDef> keydefs) throws DITAOTException {
-        XMLStreamWriter keydef = null;
+        XMLStreamWriter writer = null;
         try (OutputStream out = new FileOutputStream(keydefFile)) {
-            keydef = XMLOutputFactory.newInstance().createXMLStreamWriter(out, "UTF-8");
-            keydef.writeStartDocument();
-            keydef.writeStartElement(ELEMENT_STUB);
-            for (final KeyDef k : keydefs) {
-                keydef.writeStartElement(ELEMENT_KEYDEF);
-                keydef.writeAttribute(ATTRIBUTE_KEYS, k.keys);
-                if (k.href != null) {
-                    keydef.writeAttribute(ATTRIBUTE_HREF, k.href.toString());
+            writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out, "UTF-8");
+            writer.writeStartDocument();
+            writer.writeStartElement(ELEMENT_STUB);
+            for (final KeyDef keydef : keydefs) {
+                writer.writeStartElement(ELEMENT_KEYDEF);
+                writer.writeAttribute(ATTRIBUTE_KEYS, keydef.keys);
+                if (keydef.href != null) {
+                    writer.writeAttribute(ATTRIBUTE_HREF, keydef.href.toString());
                 }
-                if (k.scope != null) {
-                    keydef.writeAttribute(ATTRIBUTE_SCOPE, k.scope);
+                if (keydef.scope != null) {
+                    writer.writeAttribute(ATTRIBUTE_SCOPE, keydef.scope);
                 }
-                if (k.format != null) {
-                    keydef.writeAttribute(ATTRIBUTE_FORMAT, k.format);
+                if (keydef.format != null) {
+                    writer.writeAttribute(ATTRIBUTE_FORMAT, keydef.format);
                 }
-                if (k.source != null) {
-                    keydef.writeAttribute(ATTRIBUTE_SOURCE, k.source.toString());
+                if (keydef.source != null) {
+                    writer.writeAttribute(ATTRIBUTE_SOURCE, keydef.source.toString());
                 }
-                keydef.writeEndElement();
+                writer.writeAttribute(ATTRIBUTE_FILTERED, Boolean.toString(keydef.filtered));
+                writer.writeEndElement();
             }
-            keydef.writeEndDocument();
+            writer.writeEndDocument();
         } catch (final XMLStreamException | IOException e) {
             throw new DITAOTException("Failed to write key definition file " + keydefFile + ": " + e.getMessage(), e);
         } finally {
-            if (keydef != null) {
+            if (writer != null) {
                 try {
-                    keydef.close();
+                    writer.close();
                 } catch (final XMLStreamException e) {
                 }
             }

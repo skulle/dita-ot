@@ -19,6 +19,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -284,33 +285,46 @@ public final class FilterUtils {
      */
     public boolean needExclude(final Element element, final QName[][] props) {
         Attributes attributes = getAttributes(element);
-		if (needExclude(attributes, props)) {
+		return needExclude(attributes, props);
+    }
+    
+    /***
+     * Tests whether topicrefs or maprefs should be filtered out. 
+     * Keydefs will update the <code>.job.xml</code> file but they are not filtered out yet.
+     */
+    public boolean needsExclusion(final Element element, final QName[][] properties) {
+        Attributes attributes = getAttributes(element);
+		if (needExclude(attributes, properties)) {
 			return true;
 		}
 		if (isTopicOrMap(attributes)) {
-			attributes = getAttributes(loadDocument(element));
-			if (needExclude(attributes, props)) {
+			Attributes referencedAttributes = getAttributes(loadDocument(element));
+			if (needExclude(referencedAttributes, properties)) {
 				updateFileInfo(element);
-				return true;
+				return isNotKeydef(attributes);
 			}
 		}
-		return false;
+		return false;    	
     }
 
 	private Attributes getAttributes(final Element element) {
-		final XMLUtils.AttributesBuilder buf = new XMLUtils.AttributesBuilder();
+		final XMLUtils.AttributesBuilder builder = new XMLUtils.AttributesBuilder();
         final NamedNodeMap attrs = element.getAttributes();
         for (int i = 0; i < attrs.getLength() ; i++) {
             final Node attr = attrs.item(i);
             if (attr.getNodeType() == Node.ATTRIBUTE_NODE) {
-                buf.add((Attr) attr);
+                builder.add((Attr) attr);
             }
         }
-        return buf.build();
+        return builder.build();
 	}
 	
 	private boolean isTopicOrMap(Attributes attributes) {
 		return !DITAVAREF_D_DITAVALREF.matches(attributes) && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes));
+	}
+	
+	private boolean isNotKeydef(Attributes attributes) {
+		return !MAPGROUP_D_KEYDEF.matches(attributes);
 	}
 	
 	private Element loadDocument(Element element) {
@@ -394,7 +408,33 @@ public final class FilterUtils {
         }
         return false;
     }
-
+    
+    public boolean extendedExclusionCheck(final Attributes attributes, final QName[][] extProps) {
+    	if (needExclude(attributes, extProps)) {
+    		return true;
+    	}
+    	
+    	// TODO how to check if a key (or its target) is filterd out?
+    	return targetsFilteredFile(attributes.getValue(ATTRIBUTE_NAME_HREF));
+    }
+    
+	private boolean targetsFilteredFile(String href) {
+		if (href == null) {
+			return false;
+		}
+		
+		Matcher matcher = Pattern.compile("(.*?)#.*").matcher(href);
+		if (matcher.find()) {
+			Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
+			if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
+				return true;
+			}
+		} 		
+		
+		Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.uri.toString().equals(href) && fileInfo.isFiltered);
+		return job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0;
+	}
+	
     private final Pattern groupPattern = Pattern.compile("(\\w+)\\((.*?)\\)");
 
     /**

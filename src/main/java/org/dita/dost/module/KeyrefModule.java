@@ -108,6 +108,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
             // Read start map
             final KeyrefReader reader = new KeyrefReader();
             reader.setLogger(logger);
+            reader.setJob(job);
             final Job.FileInfo in = job.getFileInfo(fi -> fi.isInput).iterator().next();
             final URI mapFile = in.uri;
             final Document doc = readMap(in);
