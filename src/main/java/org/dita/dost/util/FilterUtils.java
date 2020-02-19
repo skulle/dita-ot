@@ -393,7 +393,6 @@ public final class FilterUtils {
                                     ? new QName[]{attr, group.getKey()}
                                     : new QName[]{attr};
                     if (extCheckExclude(propList, group.getValue())) {
-                    	logger.info("extCheckExclude is true, excluded for attr " + attr.getLocalPart());
                         return true;
                     }
                 }
@@ -412,7 +411,6 @@ public final class FilterUtils {
                     propValue = getLabelValue(propName, atts.getValue(current.getNamespaceURI(), current.getLocalPart()));
                 }
                 if (propValue != null && extCheckExclude(propList, Arrays.asList(propValue.split("\\s+")))) {
-                	logger.info("propValue != null && extCheckExclude is true, excluded for propValue " + propValue);
                     return true;
                 }
             }
