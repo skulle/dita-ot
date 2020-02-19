@@ -413,7 +413,6 @@ public final class FilterUtils {
     	if (needExclude(attributes, extProps)) {
     		return true;
     	}
-    	
     	return targetsFilteredFile(attributes.getValue(ATTRIBUTE_NAME_HREF));
     }
     
@@ -424,9 +423,11 @@ public final class FilterUtils {
 		
 		Matcher matcher = Pattern.compile("(.*?)#.*").matcher(href);
 		if (matcher.find()) {
-			Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
-			if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
-				return true;
+			if(matcher.groupCount()>0 && matcher.group(1).length()>0) {
+				Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
+				if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
+					return true;
+				}
 			}
 		} 		
 		
