@@ -393,6 +393,7 @@ public final class FilterUtils {
                                     ? new QName[]{attr, group.getKey()}
                                     : new QName[]{attr};
                     if (extCheckExclude(propList, group.getValue())) {
+                    	logger.info("extCheckExclude is true, excluded for attr " + attr.getLocalPart());
                         return true;
                     }
                 }
@@ -411,6 +412,7 @@ public final class FilterUtils {
                     propValue = getLabelValue(propName, atts.getValue(current.getNamespaceURI(), current.getLocalPart()));
                 }
                 if (propValue != null && extCheckExclude(propList, Arrays.asList(propValue.split("\\s+")))) {
+                	logger.info("propValue != null && extCheckExclude is true, excluded for propValue " + propValue);
                     return true;
                 }
             }
@@ -422,7 +424,6 @@ public final class FilterUtils {
     	if (needExclude(attributes, extProps)) {
     		return true;
     	}
-    	
     	// TODO how to check if a key (or its target) is filterd out?
     	return targetsFilteredFile(attributes.getValue(ATTRIBUTE_NAME_HREF));
     }
@@ -434,9 +435,11 @@ public final class FilterUtils {
 		
 		Matcher matcher = Pattern.compile("(.*?)#.*").matcher(href);
 		if (matcher.find()) {
-			Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
-			if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
-				return true;
+			if(matcher.groupCount()>0 && matcher.group(1).length()>0) {
+				Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
+				if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
+					return true;
+				}
 			}
 		} 		
 		
