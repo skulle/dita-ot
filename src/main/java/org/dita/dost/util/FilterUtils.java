@@ -295,7 +295,6 @@ public final class FilterUtils {
     public boolean needsExclusion(final Element element, final QName[][] properties) {
         Attributes attributes = getAttributes(element);
 		if (needExclude(attributes, properties)) {
-            updateJob(element,attributes);
 			return true;
 		}
 		if (isTopicOrMap(attributes)) {
@@ -353,14 +352,6 @@ public final class FilterUtils {
 		return builder;
 	}
 
-	private void updateJob(Element element, Attributes attributes) {
-        if (MAPGROUP_D_KEYDEF.matches(attributes)) {
-            job.addFilteredKey(attributes.getValue(ATTRIBUTE_NAME_KEYS),attributes.getValue(ATTRIBUTE_NAME_HREF));
-        } else if (isTopicOrMap(attributes)){
-            updateFileInfo(element);
-        }
-    }
-	
 	private void updateFileInfo(Element element) {
 		String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
 		try {
@@ -422,7 +413,6 @@ public final class FilterUtils {
     	if (needExclude(attributes, extProps)) {
     		return true;
     	}
-    	// TODO how to check if a key (or its target) is filterd out?
     	return targetsFilteredFile(attributes.getValue(ATTRIBUTE_NAME_HREF));
     }
     
