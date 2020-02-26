@@ -13,6 +13,8 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static javax.xml.XMLConstants.NULL_NS_URI;
 import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.StringUtils.isEmptyString;
+import static org.dita.dost.util.StringUtils.notEmpty;
 
 import java.io.IOException;
 import java.net.URI;
@@ -53,15 +55,14 @@ import javax.xml.transform.sax.SAXSource;
  *
  * @author Wu, Zhi Qiang
  */
-public final class FilterUtils {
+public class FilterUtils {
 
     /** Subject scheme file extension */
     public static final String SUBJECT_SCHEME_EXTENSION = ".subm";
     public static final FilterKey DEFAULT = new FilterKey(QName.valueOf(DEFAULT_ACTION), null);
 
     private DITAOTLogger logger;
-    private Job job;
-    
+
     /** Actions for filter keys. */
     private final Map<FilterKey, Action> filterMap;
     
@@ -132,10 +133,6 @@ public final class FilterUtils {
         this.logger = logger;
     }
     
-    public void setJob(Job job) {
-    	this.job = job;
-    }
-
     @Override
     public String toString() {
         return filterMap.toString();
@@ -289,25 +286,38 @@ public final class FilterUtils {
     }
     
     /***
-     * Tests whether topicrefs or maprefs should be filtered out. 
+     * Tests whether elements of maps/topics should be filtered out.
      * Filtered Keydefs are listed in the <code>.job.xml</code> file.
      */
     public boolean needsExclusion(final Element element, final QName[][] properties) {
         Attributes attributes = getAttributes(element);
 		if (needExclude(attributes, properties)) {
+            updateJobIfKeyFiltered(attributes);
+            excludeReferencedTopic(element, properties, attributes);
 			return true;
 		}
-		if (isTopicOrMap(attributes)) {
-			Attributes referencedAttributes = getAttributes(loadDocument(element));
-			if (needExclude(referencedAttributes, properties)) {
-				updateFileInfo(element);
-				return isNotKeydef(attributes);
-			}
-		}
-		return false;    	
+
+		return excludeReferencedTopic(element, properties, attributes);
     }
 
-	private Attributes getAttributes(final Element element) {
+    private boolean excludeReferencedTopic(Element element, QName[][] properties, Attributes attributes) {
+        String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
+        if (isMapTopicRef(attributes) && notEmpty(href)) {
+            Optional<Element> referencedDocument = loadDocument(href);
+            if (!referencedDocument.isPresent()) {
+                return false;
+            }
+
+            Attributes referencedAttributes = getAttributes(referencedDocument.get());
+            if (needExclude(referencedAttributes, properties)) {
+                updateFileInfo(href);
+                return isNotKeydef(attributes);
+            }
+        }
+        return false;
+    }
+
+	Attributes getAttributes(final Element element) {
 		final XMLUtils.AttributesBuilder builder = new XMLUtils.AttributesBuilder();
         final NamedNodeMap attrs = element.getAttributes();
         for (int i = 0; i < attrs.getLength() ; i++) {
@@ -319,29 +329,26 @@ public final class FilterUtils {
         return builder.build();
 	}
 	
-	private boolean isTopicOrMap(Attributes attributes) {
+	private boolean isMapTopicRef(Attributes attributes) {
 		return !DITAVAREF_D_DITAVALREF.matches(attributes) && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes));
 	}
 	
 	private boolean isNotKeydef(Attributes attributes) {
 		return !MAPGROUP_D_KEYDEF.matches(attributes);
 	}
-	
-	private Element loadDocument(Element element) {
-		String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
-		if (href !=null && href.trim().length() > 0) {
-			try {
-				String absoluteHref = job.getFileInfo(new URI(href)).src.toString();
-				DocumentBuilder builder = newDocumentBuilder();
-		        Document document = builder.parse(new InputSource(absoluteHref));
-				return document.getDocumentElement();
-			} catch (NullPointerException | SAXException | IOException | URISyntaxException | ParserConfigurationException e) {
-				logger.warn(format("Source document could not be loaded for %s. Cannot validate filtering attributes.", href));
-				return element;
-			}
-		}
-		return element;
-	}
+
+    private Optional<Element> loadDocument(String href) {
+        try {
+            Job job = Job.instance;
+            String absoluteHref = job.getFileInfo(new URI(href)).src.toString();
+            DocumentBuilder builder = newDocumentBuilder();
+            Document document = builder.parse(new InputSource(absoluteHref));
+            return Optional.of(document.getDocumentElement());
+        } catch (NullPointerException | SAXException | IOException | URISyntaxException | ParserConfigurationException e) {
+            logger.warn(format("Source document could not be loaded for %s. Cannot validate filtering attributes.", href));
+        }
+        return Optional.empty();
+    }
 
 	private DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -352,12 +359,18 @@ public final class FilterUtils {
 		return builder;
 	}
 
-	private void updateFileInfo(Element element) {
-		String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
+	private void updateJobIfKeyFiltered(Attributes attributes) {
+        if (MAPGROUP_D_KEYDEF.matches(attributes)) {
+            Job.instance.addFilteredKey(attributes.getValue(ATTRIBUTE_NAME_KEYS), attributes.getValue(ATTRIBUTE_NAME_HREF));
+        }
+    }
+
+	private void updateFileInfo(String href) {
 		try {
 			URI fileUri = new URI(href);
-			job.getFileInfo(fileUri).isFiltered=true;
-		} catch (URISyntaxException e) {
+            FileInfo fileInfo = Job.instance.getFileInfo(fileUri);
+            fileInfo.isFiltered=true;
+		} catch (URISyntaxException | NullPointerException e) {
 			logger.warn(format("Couldn't update fileinfo %s", href));
 		}
 	}
@@ -408,32 +421,55 @@ public final class FilterUtils {
         }
         return false;
     }
-    
+
     public boolean extendedExclusionCheck(final Attributes attributes, final QName[][] extProps) {
     	if (needExclude(attributes, extProps)) {
     		return true;
     	}
-    	return targetsFilteredFile(attributes.getValue(ATTRIBUTE_NAME_HREF));
+    	
+    	return targetsFilteredFile(attributes);
     }
     
-	private boolean targetsFilteredFile(String href) {
-		if (href == null) {
-			return false;
-		}
-		
-		Matcher matcher = Pattern.compile("(.*?)#.*").matcher(href);
-		if (matcher.find()) {
-			if(matcher.groupCount()>0 && matcher.group(1).length()>0) {
-				Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.src.toString().endsWith(matcher.group(1)) && fileInfo.isFiltered);
-				if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
-					return true;
-				}
-			}
-		} 		
-		
-		Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.uri.toString().equals(href) && fileInfo.isFiltered);
+	boolean targetsFilteredFile(Attributes attributes) {
+        final String link = getLinkingAttribute(attributes);
+        if (isEmptyString(link)) {
+            return false;
+        }
+
+        final Job job = Job.instance;
+        final String fileName = matchFileName(link);
+        if (notEmpty(fileName)) {
+            Predicate<FileInfo> isFiltered = fileInfo -> (
+                    fileInfo.src != null && fileInfo.src.toString().endsWith(fileName) && fileInfo.isFiltered);
+            if (job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0) {
+                return true;
+            }
+        }
+
+		Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.uri.toString().equals(link) && fileInfo.isFiltered);
 		return job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0;
 	}
+
+	String matchFileName(String link) {
+        String matchAllBeforeHashOrAll = "(.*?)(?=#|$)";
+        Matcher matcher = Pattern.compile(matchAllBeforeHashOrAll).matcher(link);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
+    }
+
+    /**
+     *
+     * @return href value if it is not empty otherwise the conref attribute value, can be null
+     */
+	String getLinkingAttribute(Attributes attributes) {
+        if (notEmpty(attributes.getValue(ATTRIBUTE_NAME_HREF))) {
+            return attributes.getValue(ATTRIBUTE_NAME_HREF);
+        }
+
+        return attributes.getValue(ATTRIBUTE_NAME_CONREF);
+    }
 	
     private final Pattern groupPattern = Pattern.compile("(\\w+)\\((.*?)\\)");
 
@@ -683,7 +719,6 @@ public final class FilterUtils {
             }
             final FilterUtils filterUtils = new FilterUtils(buf, foregroundConflictColor, backgroundConflictColor);
             filterUtils.setLogger(logger);
-            filterUtils.setJob(job);
             filterUtils.logMissingAction = logMissingAction;
             return filterUtils;
         } else {
