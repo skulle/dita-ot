@@ -41,6 +41,7 @@ public class KeyDef {
     
 
     /** Space delimited list of key names */
+    public final String parentScopeId;
     public final String keys;
     public final URI href;
     public final String scope;
@@ -57,19 +58,21 @@ public class KeyDef {
      * @param scope link scope, may be {@code null}
      * @param source key definition source, may be {@code null}
      */
-    public KeyDef(String keys, final URI href, final String scope, final String format, final URI source, final Element element) {
+    public KeyDef(String keys, final URI href, final String scope, final String format, final URI source, final Element element, final String parentScopeId) {
         this.keys = keys;
         this.href = href == null || href.toString().isEmpty() ? null : href;
         this.scope = scope == null ? ATTR_SCOPE_VALUE_LOCAL : scope;
         this.format = format == null ? ATTR_FORMAT_VALUE_DITA : format;
         this.source = source;
         this.element = element;
+        this.parentScopeId = parentScopeId;
     }
 
     @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
     public KeyDef(@JsonProperty("keys")final String keys, @JsonProperty("href")final URI href,
                   @JsonProperty("scope")final String scope, @JsonProperty("format")final String format,
                   @JsonProperty("source")final URI source, @JsonProperty("element")final Element element,
+                  @JsonProperty("parentScopeId") final String parentScopeId,
                   @JsonProperty("filtered")boolean filtered) {
         this.keys = keys;
         this.href = href == null || href.toString().isEmpty() ? null : href;
@@ -77,6 +80,7 @@ public class KeyDef {
         this.format = format == null ? ATTR_FORMAT_VALUE_DITA : format;
         this.source = source;
         this.element = element;
+        this.parentScopeId = parentScopeId;
         this.filtered = filtered;
     }
     

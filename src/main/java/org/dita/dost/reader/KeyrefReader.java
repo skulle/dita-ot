@@ -10,11 +10,12 @@ package org.dita.dost.reader;
 
 import static java.util.Arrays.*;
 import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.StringUtils.getExtProps;
+import static org.dita.dost.util.Job.KEYDEF_FILTERED_LIST_FILE;
 import static org.dita.dost.util.URLUtils.*;
 import static org.dita.dost.util.XMLUtils.*;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 
@@ -24,6 +25,11 @@ import org.dita.dost.log.MessageBean;
 import org.dita.dost.log.MessageUtils;
 import org.dita.dost.util.*;
 import org.w3c.dom.*;
+
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.dita.dost.log.DITAOTLogger;
 
 /**
@@ -55,6 +61,7 @@ public final class KeyrefReader implements AbstractReader {
     private DITAOTLogger logger;
     private Job job;
     private final DocumentBuilder builder;
+    private final List<KeyDef> filteredKeyDefList;
     private KeyScope rootScope;
     private URI currentFile;
 
@@ -63,6 +70,7 @@ public final class KeyrefReader implements AbstractReader {
      */
     public KeyrefReader() {
         builder = XMLUtils.getDocumentBuilder();
+        filteredKeyDefList = new ArrayList<KeyDef>();
     }
 
     @Override
@@ -104,25 +112,31 @@ public final class KeyrefReader implements AbstractReader {
         // TODO: determine effective key definitions here
         keyScope = inheritParentKeys(keyScope);
         rootScope = resolveIntermediate(keyScope);
+        if(filteredKeyDefList.size()>0)
+        	appendKeyDefinitions(filteredKeyDefList);
     }
 
     /** Read keys scopes in map. */
     private KeyScope readScopes(final Document doc) {
-        final List<KeyScope> scopes = readScopes(doc.getDocumentElement());
+        final List<KeyScope> scopes = readScopes(doc.getDocumentElement(), null);
         if (scopes.size() == 1 && scopes.get(0).name == null) {
             return scopes.get(0);
         } else {
             return new KeyScope("#root", null, Collections.emptyMap(), scopes);
         }
     }
-    private List<KeyScope> readScopes(final Element root) {
+    private List<KeyScope> readScopes(final Element root, String parentScopeId) {
         final List<KeyScope> childScopes = new ArrayList<>();
         final Map<String, KeyDef> keyDefs = new HashMap<>();
-        readScope(root, keyDefs);
-        readChildScopes(root, childScopes);
         final String keyscope = root.getAttribute(ATTRIBUTE_NAME_KEYSCOPE).trim();
         if (keyscope.isEmpty()) {
-            return Collections.singletonList(new KeyScope("#root", null, keyDefs, childScopes));
+        	//Means it is a root scope.
+        	parentScopeId = "#root";
+        }
+        readScope(root, keyDefs, parentScopeId);
+        readChildScopes(root, childScopes, parentScopeId);
+        if (keyscope.isEmpty()) {
+            return Collections.singletonList(new KeyScope(parentScopeId, null, keyDefs, childScopes));
         } else {
             final List<KeyScope> res = new ArrayList<>();
             for (final String scope: keyscope.split("\\s+")) {
@@ -153,26 +167,26 @@ public final class KeyrefReader implements AbstractReader {
         return res.toString();
     }
 
-    private void readChildScopes(final Element elem, final List<KeyScope> childScopes) {
+    private void readChildScopes(final Element elem, final List<KeyScope> childScopes, String parentScopeId) {
         for (final Element child: getChildElements(elem)) {
             if (child.getAttributeNode(ATTRIBUTE_NAME_KEYSCOPE) != null) {
-                final List<KeyScope> childScope = readScopes(child);
+                final List<KeyScope> childScope = readScopes(child, parentScopeId);
                 childScopes.addAll(childScope);
             } else {
-                readChildScopes(child, childScopes);
+                readChildScopes(child, childScopes, parentScopeId);
             }
         }
     }
 
     /** Read key definitions from a key scope. */
-    private void readScope(final Element scope, final Map<String, KeyDef> keyDefs) {
+    private void readScope(final Element scope, final Map<String, KeyDef> keyDefs, String parentScopeId) {
         final List<Element> maps = new ArrayList<>();
         maps.add(scope);
         for (final Element child: getChildElements(scope)) {
             collectMaps(child, maps);
         }
         for (final Element map: maps) {
-            readMap(map, keyDefs);
+            readMap(map, keyDefs, parentScopeId);
         }
     }
 
@@ -190,16 +204,16 @@ public final class KeyrefReader implements AbstractReader {
     }
 
     /** Recursively read key definitions from a single map fragment. */
-    private void readMap(final Element map, final Map<String, KeyDef> keyDefs) {
-        readKeyDefinition(map, keyDefs);
+    private void readMap(final Element map, final Map<String, KeyDef> keyDefs, String parentScopeId) {
+        readKeyDefinition(map, keyDefs, parentScopeId);
         for (final Element elem: getChildElements(map)) {
             if (!(SUBMAP.matches(elem) || elem.getAttributeNode(ATTRIBUTE_NAME_KEYSCOPE) != null)) {
-                readMap(elem, keyDefs);
+                readMap(elem, keyDefs, parentScopeId);
             }
         }
     }
 
-    private void readKeyDefinition(final Element elem, final Map<String, KeyDef> keyDefs) {
+    private void readKeyDefinition(final Element elem, final Map<String, KeyDef> keyDefs, String parentScopeId) {
         final String keyName = elem.getAttribute(ATTRIBUTE_NAME_KEYS);
         if (!keyName.isEmpty()) {
             for (final String key: keyName.trim().split("\\s+")) {
@@ -213,14 +227,28 @@ public final class KeyrefReader implements AbstractReader {
                     final String scope = s.isEmpty() ? null : s;
                     final String f = copy.getAttribute(ATTRIBUTE_NAME_FORMAT);
                     final String format = f.isEmpty() ? null : f;
-                    final KeyDef keyDef = new KeyDef(key, href, scope, format, currentFile, copy);
+                    final KeyDef keyDef = new KeyDef(key, href, scope, format, currentFile, copy, parentScopeId);
                     if (job.getFileInfo(href) != null) {
                         keyDef.setFiltered(job.getFileInfo(href).isFiltered);
+                        if(job.getFileInfo(href).isFiltered) {
+                        	filteredKeyDefList.add(keyDef);
+                        }
                     }
                     keyDefs.put(key, keyDef);
                 }
             }
         }
+    }
+    
+    private void appendKeyDefinitions(List<KeyDef> keyDef) {
+    	ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			objectMapper.writeValue(new File(job.tempDir, KEYDEF_FILTERED_LIST_FILE), keyDef);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			logger.error("Failed to append JSON KeyDef!!!", e);
+		}
+
     }
 
     /** Cascade child keys with prefixes to parent key scopes. */
@@ -237,7 +265,7 @@ public final class KeyrefReader implements AbstractReader {
         final String p = buf.toString();
         for (final Map.Entry<String, KeyDef> e: scope.keyDefinition.entrySet()) {
             final KeyDef oldKeyDef = e.getValue();
-            final KeyDef newKeyDef = new KeyDef(p + oldKeyDef.keys, oldKeyDef.href, oldKeyDef.scope, oldKeyDef.format, oldKeyDef.source, oldKeyDef.element);
+            final KeyDef newKeyDef = new KeyDef(p + oldKeyDef.keys, oldKeyDef.href, oldKeyDef.scope, oldKeyDef.format, oldKeyDef.source, oldKeyDef.element, scope.id);
             if (!keys.containsKey(newKeyDef.keys)) {
                 keys.put(newKeyDef.keys, newKeyDef);
             }
@@ -303,7 +331,7 @@ public final class KeyrefReader implements AbstractReader {
             }
             final Element res = mergeMetadata(keyRefDef.element, elem);
             res.removeAttribute(ATTRIBUTE_NAME_KEYREF);
-            return new KeyDef(keyDef.keys, keyRefDef.href, keyRefDef.scope, keyRefDef.format, keyRefDef.source, res);
+            return new KeyDef(keyDef.keys, keyRefDef.href, keyRefDef.scope, keyRefDef.format, keyRefDef.source, res, scope.id);
         } else {
             return keyDef;
         }

@@ -1,12 +1,19 @@
 package org.dita.dost.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.InputStream;
+import java.util.List;
 
-import static org.junit.Assert.*;
+import org.junit.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 public class KeyScopeTest {
 
@@ -17,17 +24,23 @@ public class KeyScopeTest {
         SimpleModule module = new SimpleModule();
         module.addDeserializer(KeyDef.class, new KeyDefDeserializer());
         objectMapper.registerModule(module);
+        TypeFactory factory = objectMapper.getTypeFactory();
+        
+        CollectionType listType = 
+        		factory.constructCollectionType(List.class, KeyDef.class);
+        
         InputStream stream = KeyScopeTest.class.getResourceAsStream("/KeyScopeTest/keyscope.json");
 
+       
         // when
-        KeyScope scope = objectMapper.readValue(stream, KeyScope.class);
+        List<KeyDef> keyDefList = objectMapper.readValue(stream, listType);
 
         // then
-        assertEquals(2,scope.keyDefinition.size());
-        assertTrue(scope.get("ktopic4").isFiltered());
-        assertNotNull(scope.get("ktopic4").element);
-        assertFalse(scope.get("ktopic2").isFiltered());
-        assertNotNull(scope.get("ktopic2").element);
+        assertEquals(2,keyDefList.size());
+        assertTrue(keyDefList.get(0).isFiltered());
+        assertNotNull(keyDefList.get(0).element);
+        assertFalse(keyDefList.get(1).isFiltered());
+        assertNotNull(keyDefList.get(1).element);
     }
 
 }

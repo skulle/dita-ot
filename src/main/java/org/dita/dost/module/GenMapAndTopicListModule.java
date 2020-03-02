@@ -477,7 +477,7 @@ public final class GenMapAndTopicListModule extends SourceReaderModule {
             final String key = e.getKey();
             final KeyDef value = e.getValue();
             if (schemeSet.contains(currentFile)) {
-                schemekeydefMap.put(key, new KeyDef(key, value.href, value.scope, value.format, currentFile, null));
+                schemekeydefMap.put(key, new KeyDef(key, value.href, value.scope, value.format, currentFile, null, null));
             }
         }
 
@@ -939,7 +939,7 @@ public final class GenMapAndTopicListModule extends SourceReaderModule {
         final Collection<KeyDef> res = new ArrayList<>(keydefs.size());
         for (final KeyDef k: keydefs) {
             final URI source = tempFileNameScheme.generateTempFileName(k.source);
-            res.add(new KeyDef(k.keys, k.href, k.scope, k.format, source, null));
+            res.add(new KeyDef(k.keys, k.href, k.scope, k.format, source, null, null));
         }
         return res;
     }

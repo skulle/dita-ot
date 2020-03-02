@@ -123,7 +123,7 @@ public final class KeydefFilter extends AbstractXMLFilter {
                         final String attrScope = atts.getValue(ATTRIBUTE_NAME_SCOPE);
                         final String attrFormat = atts.getValue(ATTRIBUTE_NAME_FORMAT);
                         if (attrScope != null && (attrScope.equals(ATTR_SCOPE_VALUE_EXTERNAL) || attrScope.equals(ATTR_SCOPE_VALUE_PEER))) {
-                            keysDefMap.put(key, new KeyDef(key, target, attrScope,  attrFormat, null, null));
+                            keysDefMap.put(key, new KeyDef(key, target, attrScope,  attrFormat, null, null, null));
                         } else {
                             String tail = null;
                             if (target.getFragment() != null) {
@@ -133,7 +133,7 @@ public final class KeydefFilter extends AbstractXMLFilter {
                             if (!target.isAbsolute()) {
                                 target = currentDir.resolve(target);
                             }
-                            keysDefMap.put(key, new KeyDef(key, setFragment(target, tail), ATTR_SCOPE_VALUE_LOCAL, attrFormat, null, null));
+                            keysDefMap.put(key, new KeyDef(key, setFragment(target, tail), ATTR_SCOPE_VALUE_LOCAL, attrFormat, null, null, null));
                         }
                     } else if (!StringUtils.isEmptyString(keyRef)) {
                         // store multi-level keys.
@@ -141,7 +141,7 @@ public final class KeydefFilter extends AbstractXMLFilter {
                     } else {
                         // target is null or empty, it is useful in the future
                         // when consider the content of key definition
-                        keysDefMap.put(key, new KeyDef(key, null, null, null, null, null));
+                        keysDefMap.put(key, new KeyDef(key, null, null, null, null, null,null));
                     }
                 } else {
                     logger.info(MessageUtils.getMessage("DOTJ045I", key).toString());

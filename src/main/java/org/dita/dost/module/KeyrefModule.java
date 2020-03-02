@@ -10,26 +10,68 @@ package org.dita.dost.module;
 
 import static java.util.stream.Collectors.toMap;
 import static org.dita.dost.util.Configuration.configuration;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.Job.*;
-import static org.dita.dost.util.URLUtils.*;
-import static org.dita.dost.util.XMLUtils.*;
+import static org.dita.dost.util.Constants.ANT_INVOKER_EXT_PARAM_TRANSTYPE;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREFEND;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_COPY_TO;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_DITA_OT_ORIG_HREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_HREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_KEYSCOPE;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_PROCESSING_ROLE;
+import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITA;
+import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITAMAP;
+import static org.dita.dost.util.Constants.ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY;
+import static org.dita.dost.util.Constants.INDEX_TYPE_ECLIPSEHELP;
+import static org.dita.dost.util.Constants.MAP_TOPICREF;
+import static org.dita.dost.util.Constants.SUBMAP;
+import static org.dita.dost.util.Job.KEYDEF_FILTERED_LIST_FILE;
+import static org.dita.dost.util.Job.KEYDEF_LIST_FILE;
+import static org.dita.dost.util.URLUtils.addSuffix;
+import static org.dita.dost.util.URLUtils.setFragment;
+import static org.dita.dost.util.URLUtils.stripFragment;
+import static org.dita.dost.util.XMLUtils.close;
+import static org.dita.dost.util.XMLUtils.getChildElements;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import javax.xml.transform.Result;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
-import org.dita.dost.reader.DitaValReader;
-import org.dita.dost.util.*;
+import org.dita.dost.pipeline.AbstractPipelineInput;
+import org.dita.dost.pipeline.AbstractPipelineOutput;
+import org.dita.dost.reader.KeyrefReader;
+import org.dita.dost.util.DelayConrefUtils;
+import org.dita.dost.util.Job;
+import org.dita.dost.util.Job.FileInfo;
+import org.dita.dost.util.KeyDef;
+import org.dita.dost.util.KeyDefDeserializer;
+import org.dita.dost.util.KeyScope;
+import org.dita.dost.util.XMLUtils;
+import org.dita.dost.writer.ConkeyrefFilter;
+import org.dita.dost.writer.KeyrefPaser;
 import org.dita.dost.writer.TopicFragmentFilter;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
@@ -37,16 +79,11 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLFilter;
-import org.dita.dost.exception.DITAOTException;
-import org.dita.dost.pipeline.AbstractPipelineInput;
-import org.dita.dost.pipeline.AbstractPipelineOutput;
-import org.dita.dost.reader.KeyrefReader;
-import org.dita.dost.writer.ConkeyrefFilter;
-import org.dita.dost.writer.KeyrefPaser;
 
-import javax.xml.transform.*;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 /**
  * Keyref ModuleElem.
@@ -116,6 +153,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
 
             transtype = input.getAttribute(ANT_INVOKER_EXT_PARAM_TRANSTYPE);
             delayConrefUtils = transtype.equals(INDEX_TYPE_ECLIPSEHELP) ? new DelayConrefUtils() : null;
+            
             for (final ResolveTask r: jobs) {
                 if (r.out != null) {
                     processFile(r);
@@ -138,7 +176,6 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
 
             try {
                 job.write();
-                serializeKeyDefinitions(rootScope);
             } catch (final IOException e) {
                 throw new DITAOTException("Failed to store job state: " + e.getMessage(), e);
             }
@@ -243,7 +280,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
             if (href != null && rewrites.containsKey(stripFragment(href))) {
                 href = setFragment(rewrites.get(stripFragment(href)), href.getFragment());
             }
-            final KeyDef newKey = new KeyDef(oldKey.keys, href, oldKey.scope, oldKey.format, oldKey.source, oldKey.element, oldKey.isFiltered());
+            final KeyDef newKey = new KeyDef(oldKey.keys, href, oldKey.scope, oldKey.format, oldKey.source, oldKey.element, scope.id, oldKey.isFiltered());
             newKeys.put(key.getKey(), newKey);
         }
         return new KeyScope(scope.id, scope.name,
@@ -355,12 +392,38 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
             return new ResolveTask(scope, f, null);
         }
     }
+    
+    private List<KeyDef> serializeKeyDefinitions(){    
+        ObjectMapper objectMapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(KeyDef.class, new KeyDefDeserializer());
+        objectMapper.registerModule(module);
+        TypeFactory factory = objectMapper.getTypeFactory();
+        
+       CollectionType listType = 
+        	    factory.constructCollectionType(List.class, KeyDef.class);
+        try {
+        	File jsonFile = new File(job.tempDir, KEYDEF_FILTERED_LIST_FILE);
+        	if(jsonFile.canRead()) {
+        		return objectMapper.readValue(jsonFile, listType);
+        	}else {
+        		logger.info("json file " + KEYDEF_FILTERED_LIST_FILE + " does not exist. No filtered keydefs in processing");
+        		return null;
+        	}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			logger.error("Error reading json file" + KEYDEF_FILTERED_LIST_FILE, e);
+			return null;
+		}
+    }
 
     /**
      * Process key references in a topic. Topic is stored with a new name if it's
      * been processed before.
      */
     private void processFile(final ResolveTask r) {
+    	List<KeyDef> filteredKeyDef = serializeKeyDefinitions();
+    	
         final List<XMLFilter> filters = new ArrayList<>();
 
         final ConkeyrefFilter conkeyrefFilter = new ConkeyrefFilter();
@@ -369,6 +432,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         conkeyrefFilter.setKeyDefinitions(r.scope);
         conkeyrefFilter.setCurrentFile(job.tempDirURI.resolve(r.in.uri));
         conkeyrefFilter.setDelayConrefUtils(delayConrefUtils);
+        conkeyrefFilter.setFilteredKeyDefinition(filteredKeyDef);
         filters.add(conkeyrefFilter);
 
         filters.add(topicFragmentFilter);
@@ -377,6 +441,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         parser.setLogger(logger);
         parser.setJob(job);
         parser.setKeyDefinition(r.scope);
+        parser.setFilteredKeyDefinition(filteredKeyDef);
         parser.setCurrentFile(job.tempDirURI.resolve(r.in.uri));
         filters.add(parser);
 
@@ -411,8 +476,9 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
             logger.error("Failed to write key definition file: " + e.getMessage(), e);
         }
     }
+    
 
-    private void serializeKeyDefinitions(KeyScope rootScope) throws IOException {
+    private void serializeKeyDefinitions(KeyScope rootScope) throws IOException {    	
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.writeValue(new File(job.tempDir, KEYDEF_LIST_FILE), rootScope);
     }

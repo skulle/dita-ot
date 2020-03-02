@@ -127,7 +127,7 @@ public final class KeyrefPaser extends AbstractXMLFilter {
      * Stack used to store the current KeyScope, and its start uri.
      */
     private final Deque<KeyScope> definitionMaps;
-
+    
     /**
      * Stack used to store the place of current element
      * relative to the key reference element.
@@ -197,7 +197,7 @@ public final class KeyrefPaser extends AbstractXMLFilter {
     public void setKeyDefinition(final KeyScope definitionMap) {
         this.definitionMaps.push(definitionMap);
     }
-
+    
     /**
      * Get set of link targets which have normal processing role. Paths are relative to current file.
      */
@@ -516,7 +516,6 @@ public final class KeyrefPaser extends AbstractXMLFilter {
         final AttributesImpl resAtts = new AttributesImpl(atts);
         boolean valid = false;
         boolean dropElement = false;
-
         for (final Map.Entry<String, String> attrPair: currentElement.attrs.entrySet()) {
             final String keyrefAttr = attrPair.getKey();
             final String refAttr = attrPair.getValue();
@@ -532,8 +531,14 @@ public final class KeyrefPaser extends AbstractXMLFilter {
                 }
 
                 keyDef = definitionMaps.peek().get(keyName);
+//Comment out for now for Raffy to try the merging of keyscope.
+//                if(keyDef == null) {
+//                	keyDef = retrieveFilteredKey(keyName);
+//                }
+                
                 final Element elem = keyDef != null ? keyDef.element : null;
-
+                
+                
                 // If definition is not null
                 if (keyDef != null) {
                 	if (keyDef.isFiltered()) {

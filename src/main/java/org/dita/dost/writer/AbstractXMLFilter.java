@@ -9,13 +9,16 @@ package org.dita.dost.writer;
 
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.util.Job;
+import org.dita.dost.util.KeyDef;
 import org.dita.dost.util.XMLUtils;
 import org.xml.sax.helpers.XMLFilterImpl;
 
@@ -29,6 +32,7 @@ public abstract class AbstractXMLFilter extends XMLFilterImpl implements Abstrac
 
     protected DITAOTLogger logger;
     protected final XMLUtils xmlUtils = new XMLUtils();
+    protected final List<KeyDef> filteredKeyDefs = new ArrayList<>();
     Job job;
     /** Absolute temporary directory URI to file being processed */
     protected URI currentFile;
@@ -59,4 +63,26 @@ public abstract class AbstractXMLFilter extends XMLFilterImpl implements Abstrac
     public void setParam(final String name, final String value) {
         params.put(name, value);
     }
+    
+    public void setFilteredKeyDefinition(List<KeyDef> keydeflist) {
+        this.filteredKeyDefs.addAll(keydeflist);
+    }
+    
+	protected KeyDef retrieveFilteredKey(String keyName) {
+		// look up the filtered key
+		KeyDef keyDef = null;
+		if(filteredKeyDefs!=null) {                		
+			for (KeyDef filteredKeyDef : filteredKeyDefs) {
+				if(filteredKeyDef.keys.equals(keyName)) {
+					keyDef = filteredKeyDef;
+					break;
+				}
+			}
+			if(keyDef!=null) {
+				filteredKeyDefs.remove(keyDef);
+			}
+		}
+		
+		return keyDef;
+	}
 }

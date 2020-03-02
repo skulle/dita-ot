@@ -56,7 +56,7 @@ public class ConkeyrefFilterTest {
     @Test
     public void testKey() throws SAXException, IOException {
         final ConkeyrefFilter f = getConkeyrefFilter();
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
@@ -72,7 +72,7 @@ public class ConkeyrefFilterTest {
     @Test
     public void testKeyAndElement() throws SAXException, IOException {
         final ConkeyrefFilter f = getConkeyrefFilter();
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null ,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
@@ -89,7 +89,7 @@ public class ConkeyrefFilterTest {
     @Test
     public void testElementInTarget() throws SAXException, IOException {
         final ConkeyrefFilter f = getConkeyrefFilter();
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita#baz"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("library.dita#baz"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
@@ -106,7 +106,7 @@ public class ConkeyrefFilterTest {
     public void testRelativePaths() throws SAXException, IOException {
         final ConkeyrefFilter f = getConkeyrefFilter();
         f.setCurrentFile(job.tempDirURI.resolve("product/sub%20folder/this.dita"));
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("common/library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", toURI("common/library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, toURI("main.ditamap"), null ,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
@@ -142,7 +142,7 @@ public class ConkeyrefFilterTest {
 
         final ConkeyrefFilter f = getConkeyrefFilter();
         f.setCurrentFile(job.tempDirURI.resolve("product/topic.dita"));
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", URI.create("../common/library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, URI.create("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", URI.create("../common/library.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, URI.create("main.ditamap"), null ,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
@@ -178,7 +178,7 @@ public class ConkeyrefFilterTest {
 
         final ConkeyrefFilter f = getConkeyrefFilter();
         f.setCurrentFile(job.tempDirURI.resolve("topic.dita"));
-        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", URI.create("LIBRARY.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, URI.create("main.ditamap"), null))));
+        f.setKeyDefinitions(createKeyScope(toMap(new KeyDef("foo", URI.create("LIBRARY.dita"), ATTR_SCOPE_VALUE_LOCAL, ATTR_FORMAT_VALUE_DITA, URI.create("main.ditamap"), null ,null))));
         f.setContentHandler(new DefaultHandler() {
             @Override
             public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {

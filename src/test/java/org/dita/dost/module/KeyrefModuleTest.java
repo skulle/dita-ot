@@ -89,7 +89,7 @@ public class KeyrefModuleTest {
     public void testAdjustResourceRenames() {
         final KeyScope scope = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target.dita"), null, null, null, null))
+                        .put("key", new KeyDef("key", create("target.dita"), null, null, null, null,"scope"))
                         .build(),
                 emptyList());
         final List<ResolveTask> src = singletonList(
@@ -101,7 +101,7 @@ public class KeyrefModuleTest {
 
         final KeyScope exp = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
+                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null, "scope"))
                         .build(),
                 emptyList());
 
@@ -112,8 +112,8 @@ public class KeyrefModuleTest {
     public void testRewriteScopeTargets() {
         final KeyScope src = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target.dita"), null, null, null, null))
-                        .put("element", new KeyDef("element", create("target.dita#target/element"), null, null, null, null))
+                        .put("key", new KeyDef("key", create("target.dita"), null, null, null, null,"scope"))
+                        .put("element", new KeyDef("element", create("target.dita#target/element"), null, null, null, null,"scope"))
                         .build(),
                 emptyList());
         final Map<URI, URI> rewrites = ImmutableMap.<URI, URI>builder()
@@ -123,8 +123,8 @@ public class KeyrefModuleTest {
 
         final KeyScope exp = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
-                        .put("element", new KeyDef("element", create("target-1.dita#target/element"), null, null, null, null))
+                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null, "scope"))
+                        .put("element", new KeyDef("element", create("target-1.dita#target/element"), null, null, null, null,"scope"))
                         .build(),
                 emptyList());
 
@@ -137,16 +137,16 @@ public class KeyrefModuleTest {
         final Document act = b.parse(new File(baseDir, "src" + File.separator + "test.ditamap"));
         final KeyScope childScope = new KeyScope("A", "A",
                             ImmutableMap.of(
-                                    "VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null),
-                                    "A.VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null)
+                                    "VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null, "A"),
+                                    "A.VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null, "A")
                             ),
                             EMPTY_LIST
         );
         final KeyScope keyScope =
                 new KeyScope("#root", null,
                             ImmutableMap.of(
-                                    "VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null),
-                                    "A.VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null)
+                                    "VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null, "#root"),
+                                    "A.VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null, "#root")
                             ),
                             singletonList(childScope)
         );

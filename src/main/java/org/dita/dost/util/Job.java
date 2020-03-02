@@ -72,14 +72,11 @@ public final class Job {
     private static final String ATTRIBUTE_HAS_CODEREF = "has-coderef";
     private static final String ATTRIBUTE_RESOURCE_ONLY = "resource-only";
     private static final String ATTRIBUTE_TARGET = "target";
-    private static final String ATTRIBUTE_CONREF_TARGET = "conref-target";
     private static final String ATTRIBUTE_CONREF_PUSH = "conrefpush";
     private static final String ATTRIBUTE_SUBJECT_SCHEME = "subjectscheme";
     private static final String ATTRIBUTE_HAS_LINK = "has-link";
     private static final String ATTRIBUTE_INPUT = "input";
-    private static final String ATTRIBUTE_COPYTO_SOURCE_LIST = "copy-to-source";
     private static final String ATTRIBUTE_OUT_DITA_FILES_LIST = "out-dita";
-    private static final String ATTRIBUTE_CHUNKED_DITAMAP_LIST = "chunked-ditamap";
     private static final String ATTRIBUTE_FLAG_IMAGE_LIST = "flag-image";
     private static final String ATTRIBUTE_SUBSIDIARY_TARGET_LIST = "subtarget";
     private static final String ATTRIBUTE_FILTERED = "filtered";
@@ -100,6 +97,7 @@ public final class Job {
 
     /** File name for key definition file */
     public static final String KEYDEF_LIST_FILE = "keydef.json";
+    public static final String KEYDEF_FILTERED_LIST_FILE = "filteredkeydef.json";
     /** File name for key definition file */
     public static final String SUBJECT_SCHEME_KEYDEF_LIST_FILE = "schemekeydef.xml";
     /** File name for temporary input file list file */

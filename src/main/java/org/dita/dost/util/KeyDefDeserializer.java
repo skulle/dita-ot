@@ -39,8 +39,9 @@ public class KeyDefDeserializer extends StdDeserializer<KeyDef> {
             String format = node.get("format").asText();
             Element element = toElement(node.get("element").asText());
             boolean filtered = node.get("filtered").asBoolean();
+            String parentScopeId = node.get("parentScopeId").asText();
 
-            return new KeyDef(keys,href,scope,format,source,element,filtered);
+            return new KeyDef(keys,href,scope,format,source,element,parentScopeId,filtered);
         } catch (URISyntaxException | ParserConfigurationException | SAXException e) {
             throw new IOException("Couldn't deserialize KeyDef", e);
         }

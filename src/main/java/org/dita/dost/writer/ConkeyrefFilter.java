@@ -48,6 +48,14 @@ public final class ConkeyrefFilter extends AbstractXMLFilter {
             final int keyIndex = conkeyref.indexOf(SLASH);
             final String key = keyIndex != -1 ? conkeyref.substring(0, keyIndex) : conkeyref;
             final KeyDef keyDef = keys.get(key);
+//Comment out for Raffy to work on keyscope merging            
+//            KeyDef filteredKeyDef = retrieveFilteredKey(key);
+//            if(filteredKeyDef!=null) {
+//            	keyDef = filteredKeyDef;
+//            }else {
+//            	keyDef = keys.get(key);
+//            }
+            
             if (keyDef != null) {
                 final String id = keyIndex != -1 ? conkeyref.substring(keyIndex + 1) : null;
                 if (delayConrefUtils != null) {
@@ -61,10 +69,9 @@ public final class ConkeyrefFilter extends AbstractXMLFilter {
                 }
                 resAtts = new AttributesImpl(atts);
                 XMLUtils.removeAttribute(resAtts, ATTRIBUTE_NAME_CONKEYREF);
-                final KeyDef k = keys.get(key);
-                if (k.href != null && (k.scope.equals(ATTR_SCOPE_VALUE_LOCAL))) {
-                    URI target = getRelativePath(k.href);
-                    final String keyFragment = k.href.getFragment();
+                if (keyDef.href != null && (keyDef.scope.equals(ATTR_SCOPE_VALUE_LOCAL))) {
+                    URI target = getRelativePath(keyDef.href);
+                    final String keyFragment = keyDef.href.getFragment();
                     if (id != null && keyFragment != null) {
                         target = setFragment(target, keyFragment + SLASH + id);
                     } else if (id != null) {
