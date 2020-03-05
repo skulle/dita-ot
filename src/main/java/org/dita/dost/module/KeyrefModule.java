@@ -33,10 +33,8 @@ import static org.dita.dost.util.XMLUtils.close;
 import static org.dita.dost.util.XMLUtils.getChildElements;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -185,18 +183,8 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
     }
 
     private KeyScope buildKeyScopes(Document document) throws DITAOTException {
-        if (Files.exists((new File(job.tempDir, KEYDEF_LIST_FILE)).toPath())) {
-            try {
-                ObjectMapper objectMapper = new ObjectMapper();
-                SimpleModule module = new SimpleModule();
-                module.addDeserializer(KeyDef.class, new KeyDefDeserializer());
-                objectMapper.registerModule(module);
-                return objectMapper.readValue(new FileInputStream(new File(job.tempDir, KEYDEF_LIST_FILE)),KeyScope.class);
-            } catch (IOException e) {
-                throw new DITAOTException("Couldn't build keyscope", e);
-            }
-        }
-
+    	List<KeyDef> keyDefList = deSerializeKeyDefinitions();
+    	
         final KeyrefReader reader = new KeyrefReader();
         reader.setLogger(logger);
         reader.setJob(job);
@@ -204,7 +192,18 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         final URI mapFile = in.uri;
         logger.info("Reading " + job.tempDirURI.resolve(mapFile).toString());
         reader.read(job.tempDirURI.resolve(mapFile), document);
-        return reader.getKeyDefinition();
+        return mergeKeyDef(reader.getKeyDefinition(), keyDefList);
+    }
+    
+    private KeyScope mergeKeyDef(KeyScope rootKeyScope, List<KeyDef> keyDefList) {
+    	for (KeyDef keyDef : keyDefList) {
+    		if (rootKeyScope.id.equals(keyDef.parentScopeId)) {
+    			rootKeyScope.keyDefinition.put(keyDef.keys, keyDef);
+    		}
+    	}
+    	
+    	rootKeyScope.childScopes.stream().map(scope -> mergeKeyDef(scope, keyDefList)).collect(Collectors.toList());
+    	return rootKeyScope;
     }
 
     private void initFilters() {
@@ -272,6 +271,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         return res;
     }
 
+    /** Original Code 
     KeyScope rewriteScopeTargets(KeyScope scope, Map<URI, URI> rewrites) {
         final Map<String, KeyDef> newKeys = new HashMap<>();
         for (Map.Entry<String, KeyDef> key : scope.keyDefinition.entrySet()) {
@@ -288,8 +288,22 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                 scope.childScopes.stream()
                         .map(c -> rewriteScopeTargets(c, rewrites))
                         .collect(Collectors.toList()));
+    } */
+    
+    KeyScope rewriteScopeTargets(KeyScope scope, Map<URI, URI> rewrites) {
+        for (Map.Entry<String, KeyDef> key : scope.keyDefinition.entrySet()) {
+            KeyDef oldKey = key.getValue();
+            URI href = oldKey.href;
+            if (href != null && rewrites.containsKey(stripFragment(href))) {
+                href = setFragment(rewrites.get(stripFragment(href)), href.getFragment());
+            }
+            
+            oldKey.href = href;
+        }
+        
+        scope.childScopes.stream().map(c -> rewriteScopeTargets(c, rewrites)).collect(Collectors.toList());
+        return scope;
     }
-
 
     /** Tuple class for key reference processing info. */
     static class ResolveTask {
@@ -393,7 +407,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         }
     }
     
-    private List<KeyDef> serializeKeyDefinitions(){    
+    private List<KeyDef> deSerializeKeyDefinitions(){    
         ObjectMapper objectMapper = new ObjectMapper();
         SimpleModule module = new SimpleModule();
         module.addDeserializer(KeyDef.class, new KeyDefDeserializer());
@@ -408,12 +422,11 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         		return objectMapper.readValue(jsonFile, listType);
         	}else {
         		logger.info("json file " + KEYDEF_FILTERED_LIST_FILE + " does not exist. No filtered keydefs in processing");
-        		return null;
+        		return new ArrayList<>();
         	}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			logger.error("Error reading json file" + KEYDEF_FILTERED_LIST_FILE, e);
-			return null;
+			return new ArrayList<>();
 		}
     }
 
@@ -422,7 +435,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
      * been processed before.
      */
     private void processFile(final ResolveTask r) {
-    	List<KeyDef> filteredKeyDef = serializeKeyDefinitions();
+    	List<KeyDef> filteredKeyDef = deSerializeKeyDefinitions();
     	
         final List<XMLFilter> filters = new ArrayList<>();
 
