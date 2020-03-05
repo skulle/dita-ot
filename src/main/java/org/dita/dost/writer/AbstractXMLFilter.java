@@ -65,7 +65,9 @@ public abstract class AbstractXMLFilter extends XMLFilterImpl implements Abstrac
     }
     
     public void setFilteredKeyDefinition(List<KeyDef> keydeflist) {
-        this.filteredKeyDefs.addAll(keydeflist);
+    	if(keydeflist!=null) {
+    		this.filteredKeyDefs.addAll(keydeflist);
+    	}
     }
     
 	protected KeyDef retrieveFilteredKey(String keyName) {
