@@ -25,7 +25,7 @@ public class KeyScope {
 
     public final String id;
     public final String name;
-    public final Map<String, KeyDef> keyDefinition;
+    public Map<String, KeyDef> keyDefinition;
     public final List<KeyScope> childScopes;
 
     @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
