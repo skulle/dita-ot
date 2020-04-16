@@ -87,7 +87,8 @@ public class KeyrefModuleTest {
     }
 
     @Test
-    public void testAdjustResourceRenames() {
+    public void adjustResourceRenames() {
+    	//given
         final KeyScope scope = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
                         .put("key", new KeyDef("key", create("target.dita"), null, null, null, null))
@@ -98,19 +99,22 @@ public class KeyrefModuleTest {
                         scope,
                         new Builder().uri(create("target.dita")).build(),
                         new Builder().uri(create("target-1.dita")).build()));
+        final KeyScope exp = new KeyScope("scope", "scope",
+        		ImmutableMap.<String, KeyDef>builder()
+        		.put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
+        		.build(),
+        		emptyList());
+        
+        //when
         final List<ResolveTask> act = module.adjustResourceRenames(src);
 
-        final KeyScope exp = new KeyScope("scope", "scope",
-                ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
-                        .build(),
-                emptyList());
-
+        //then
         assertEquals(exp, act.get(0).scope);
     }
 
     @Test
-    public void testRewriteScopeTargets() {
+    public void rewriteScopeTargets() {
+    	//given
         final KeyScope src = new KeyScope("scope", "scope",
                 ImmutableMap.<String, KeyDef>builder()
                         .put("key", new KeyDef("key", create("target.dita"), null, null, null, null))
@@ -120,22 +124,27 @@ public class KeyrefModuleTest {
         final Map<URI, URI> rewrites = ImmutableMap.<URI, URI>builder()
                 .put(create("target.dita"), create("target-1.dita"))
                 .build();
+        final KeyScope exp = new KeyScope("scope", "scope",
+        		ImmutableMap.<String, KeyDef>builder()
+        		.put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
+        		.put("element", new KeyDef("element", create("target-1.dita#target/element"), null, null, null, null))
+        		.build(),
+        		emptyList());
+        
+        
+        //when
         final KeyScope act = module.rewriteScopeTargets(src, rewrites);
 
-        final KeyScope exp = new KeyScope("scope", "scope",
-                ImmutableMap.<String, KeyDef>builder()
-                        .put("key", new KeyDef("key", create("target-1.dita"), null, null, null, null))
-                        .put("element", new KeyDef("element", create("target-1.dita#target/element"), null, null, null, null))
-                        .build(),
-                emptyList());
-
+        //then
         assertEquals(exp, act);
     }
 
     @Test
-    public void testWalkMap() throws ParserConfigurationException, IOException, SAXException {
+    public void walkMap() throws ParserConfigurationException, IOException, SAXException {
+    	//given
         final DocumentBuilder b = DocumentBuilderFactory.newInstance().newDocumentBuilder();
         final Document act = b.parse(new File(baseDir, "src" + File.separator + "test.ditamap"));
+        final Document exp = b.parse(new File(baseDir, "exp" + File.separator + "test.ditamap"));
         final KeyScope childScope = new KeyScope("A", "A",
                             ImmutableMap.of(
                                     "VAR", new KeyDef("VAR", null, "local", "dita", inputMap, null),
@@ -152,12 +161,14 @@ public class KeyrefModuleTest {
                             singletonList(childScope)
         );
         final List<ResolveTask> res = new ArrayList<>();
-        module.walkMap(act.getDocumentElement(), keyScope, res);
-        final Document exp = b.parse(new File(baseDir, "exp" + File.separator + "test.ditamap"));
-
+        final List<String> scopeURIList = new ArrayList<>();
+        
+        //when
+        module.walkMap(act.getDocumentElement(), keyScope, res, scopeURIList);
+        
+        //then
         final ResolveTask subMapTask = res.stream().filter(r -> r.in.src.equals(subMap)).findFirst().get();
         assertEquals(subMapTask.scope, childScope);
-
         assertXMLEqual(exp, act);
     }
 

@@ -8,16 +8,70 @@
  */
 package org.dita.dost.module;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
+import static java.nio.file.Files.exists;
+import static java.util.stream.Collectors.toMap;
+import static org.dita.dost.util.Configuration.configuration;
+import static org.dita.dost.util.Constants.ANT_INVOKER_EXT_PARAM_TRANSTYPE;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREFEND;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_COPY_TO;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_DITA_OT_ORIG_HREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_HREF;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_KEYSCOPE;
+import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_PROCESSING_ROLE;
+import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITA;
+import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITAMAP;
+import static org.dita.dost.util.Constants.ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY;
+import static org.dita.dost.util.Constants.INDEX_TYPE_ECLIPSEHELP;
+import static org.dita.dost.util.Constants.MAP_TOPICREF;
+import static org.dita.dost.util.Constants.SUBMAP;
+import static org.dita.dost.util.Job.KEYDEF_LIST_FILE;
+import static org.dita.dost.util.URLUtils.addSuffix;
+import static org.dita.dost.util.URLUtils.setFragment;
+import static org.dita.dost.util.URLUtils.stripFragment;
+import static org.dita.dost.util.XMLUtils.close;
+import static org.dita.dost.util.XMLUtils.getChildElements;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.xml.transform.Result;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.KeyrefReader;
-import org.dita.dost.util.*;
+import org.dita.dost.util.DelayConrefUtils;
+import org.dita.dost.util.Job;
+import org.dita.dost.util.Job.FileInfo;
+import org.dita.dost.util.KeyDef;
+import org.dita.dost.util.KeyScope;
+import org.dita.dost.util.KeyScopeSerializer;
+import org.dita.dost.util.KeydefDeserializer;
+import org.dita.dost.util.XMLUtils;
 import org.dita.dost.writer.ConkeyrefFilter;
 import org.dita.dost.writer.KeyrefPaser;
 import org.dita.dost.writer.TopicFragmentFilter;
@@ -28,28 +82,9 @@ import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLFilter;
 
-import javax.xml.transform.*;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static java.lang.String.format;
-import static java.lang.System.currentTimeMillis;
-import static java.nio.file.Files.exists;
-import static java.util.stream.Collectors.toMap;
-import static org.dita.dost.util.Configuration.configuration;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.Job.FileInfo;
-import static org.dita.dost.util.Job.KEYDEF_LIST_FILE;
-import static org.dita.dost.util.URLUtils.*;
-import static org.dita.dost.util.XMLUtils.close;
-import static org.dita.dost.util.XMLUtils.getChildElements;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 
 /**
  * Keyref ModuleElem.
@@ -205,21 +240,21 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         final FileInfo input = job.getFileInfo(fi -> fi.isInput).iterator().next();
         res.add(new ResolveTask(rootScope, input, null));
         // Collect topics from map and rewrite topicrefs for duplicates
-        walkMap(doc.getDocumentElement(), rootScope, res);
+        final List<String> scopeuriList = new ArrayList<>();
+        walkMap(doc.getDocumentElement(), rootScope, res, scopeuriList);
         // Collect topics not in map and map itself
         for (final FileInfo f: fis) {
             if (!usage.containsKey(f.uri)) {
                 res.add(processTopic(f, rootScope, f.isResourceOnly));
             }
         }
-
-        final List<ResolveTask> deduped = removeDuplicateResolveTargets(res);
+        
         if (fileInfoFilter != null) {
-            return adjustResourceRenames(deduped.stream()
+            return adjustResourceRenames(res.stream()
                     .filter(rs -> fileInfoFilter.test(rs.in))
                     .collect(Collectors.toList()));
         } else {
-            return adjustResourceRenames(deduped);
+        	return adjustResourceRenames(res);
         }
     }
 
@@ -310,16 +345,8 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
     }
 
     /** Recursively walk map and process topics that have keyrefs. */
-    void walkMap(final Element elem, final KeyScope scope, final List<ResolveTask> res) {
+    void walkMap(final Element elem, final KeyScope scope, final List<ResolveTask> res, final List<String> scopeURIList) {
         List<KeyScope> ss = Collections.singletonList(scope);
-        if (elem.getAttributeNode(ATTRIBUTE_NAME_KEYSCOPE) != null) {
-            ss = new ArrayList<>();
-            for (final String keyscope: elem.getAttribute(ATTRIBUTE_NAME_KEYSCOPE).trim().split("\\s+")) {
-                final KeyScope s = scope.getChildScope(keyscope);
-                assert s != null;
-                ss.add(s);
-            }
-        }
         Attr hrefNode = elem.getAttributeNode(ATTRIBUTE_NAME_COPY_TO);
         if (hrefNode == null) {
             hrefNode = elem.getAttributeNode(ATTRIBUTE_NAME_HREF);
@@ -327,6 +354,20 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         if (hrefNode == null && SUBMAP.matches(elem)) {
             hrefNode = elem.getAttributeNode(ATTRIBUTE_NAME_DITA_OT_ORIG_HREF);
         }
+        
+        if (elem.getAttributeNode(ATTRIBUTE_NAME_KEYSCOPE) != null) {
+            ss = new ArrayList<>();
+            for (final String keyscope: elem.getAttribute(ATTRIBUTE_NAME_KEYSCOPE).trim().split("\\s+")) {
+                final KeyScope s = scope.getChildScope(keyscope);
+                assert s != null;
+                if(s==null) {
+                	logger.warn("Childscope is null for " + hrefNode + "keyscope of " + keyscope);
+                }else {
+                	ss.add(s);
+                }
+            }
+        }
+        
         final boolean isResourceOnly = isResourceOnly(elem);
         for (final KeyScope s: ss) {
             if (hrefNode != null) {
@@ -334,7 +375,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                 final FileInfo fi = job.getFileInfo(href);
                 if (fi != null && fi.hasKeyref) {
                     final int count = usage.getOrDefault(fi.uri, 0);
-                    final Optional<ResolveTask> existing = res.stream().filter(rt -> rt.scope.equals(s) && rt.in.uri.equals(fi.uri)).findAny();
+                    final Optional<ResolveTask> existing = res.stream().filter(rt -> rt.in!=null&& rt.scope!=null && rt.scope.equals(s) && (rt.in.uri==null?"":rt.in.uri).equals(fi.uri)).findAny();
                     if (count != 0 && existing.isPresent()) {
                         final ResolveTask resolveTask = existing.get();
                         if (resolveTask.out != null) {
@@ -343,7 +384,10 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                         }
                     } else {
                         final ResolveTask resolveTask = processTopic(fi, s, isResourceOnly);
-                        res.add(resolveTask);
+                        if(!scopeURIList.contains(resolveTask.scope.id+resolveTask.in.uri.toString())) {
+                        	scopeURIList.add(resolveTask.scope.id+resolveTask.in.uri.toString());
+                        	res.add(resolveTask);
+                        }
                         final Integer used = usage.get(fi.uri);
                         if (used > 1) {
                             final URI value = tempFileNameScheme.generateTempFileName(resolveTask.out.result);
@@ -352,8 +396,9 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                     }
                 }
             }
+            
             for (final Element child : getChildElements(elem, MAP_TOPICREF)) {
-                walkMap(child, s, res);
+                walkMap(child, s, res, scopeURIList);
             }
         }
     }
