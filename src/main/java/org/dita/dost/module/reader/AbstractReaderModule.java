@@ -44,6 +44,7 @@ import static org.dita.dost.reader.GenListModuleReader.Reference;
 import static org.dita.dost.util.Configuration.*;
 import static org.dita.dost.util.Constants.*;
 import static org.dita.dost.util.Job.FileInfo;
+import static org.dita.dost.util.Job.SUBJECT_SCHEME_KEYDEF_LIST_FILE;
 import static org.dita.dost.util.Job.USER_INPUT_FILE_LIST_FILE;
 import static org.dita.dost.util.URLUtils.*;
 import static org.dita.dost.util.XMLUtils.close;
@@ -133,6 +134,8 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     private XMLReader reader;
     /** Absolute path to current source file. */
     URI currentFile;
+    /** Subject scheme key map. Key is key value, value is key definition. */
+    private Map<String, KeyDef> schemekeydefMap;
     DitaWriterFilter ditaWriterFilter;
     TopicFragmentFilter topicFragmentFilter;
 
@@ -282,6 +285,8 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
                     .filter(File::exists)
                     .orElse(null);
         }
+        // create the keydef file for scheme files
+        schemekeydefMap = new HashMap<>();
     }
 
     void processWaitList() throws DITAOTException {
@@ -453,6 +458,16 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             copyTo.put(target, source);
         }
         schemeSet.addAll(listFilter.getSchemeRefSet());
+        
+        // collect key definitions
+        for (final Map.Entry<String, KeyDef> e: keydefFilter.getKeysDMap().entrySet()) {
+            // key and value.keys will differ when keydef is a redirect to another keydef
+            final String key = e.getKey();
+            final KeyDef value = e.getValue();
+            if (schemeSet.contains(currentFile)) {
+                schemekeydefMap.put(key, new KeyDef(key, value.href, value.scope, value.format, currentFile, null));
+            }
+        }
 
         hrefTargetSet.addAll(listFilter.getHrefTargets());
         conrefTargetSet.addAll(listFilter.getConrefTargets());
@@ -730,6 +745,8 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             delayConrefUtils.writeMapToXML(exportAnchorsFilter.getPluginMap());
             delayConrefUtils.writeExportAnchors(exportAnchorsFilter, tempFileNameScheme);
         }
+        
+        KeyDef.writeKeydef(new File(job.tempDir, SUBJECT_SCHEME_KEYDEF_LIST_FILE), addFilePrefix(schemekeydefMap.values()));
     }
 
     protected void addToJob(FileInfo fileInfo) {
@@ -806,6 +823,15 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
                 newSet.add(tempFileNameScheme.generateTempFileName(file));
             }
             res.put(key.equals(ROOT_URI) ? key : tempFileNameScheme.generateTempFileName(key), newSet);
+        }
+        return res;
+    }
+    
+    private Collection<KeyDef> addFilePrefix(final Collection<KeyDef> keydefs) {
+        final Collection<KeyDef> res = new ArrayList<>(keydefs.size());
+        for (final KeyDef k: keydefs) {
+            final URI source = tempFileNameScheme.generateTempFileName(k.source);
+            res.add(new KeyDef(k.keys, k.href, k.scope, k.format, source, null));
         }
         return res;
     }
