@@ -13,29 +13,22 @@ import org.dita.dost.log.MessageUtils;
 import org.dita.dost.module.BranchFilterModule.Branch;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
-import org.dita.dost.util.FilterUtils;
-import org.dita.dost.util.FilterUtils.Flag;
 import org.dita.dost.util.Job.FileInfo;
 import org.dita.dost.util.XMLUtils;
 import org.w3c.dom.*;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
-import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.EMPTY_LIST;
-import static java.util.Collections.singletonList;
 import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.StringUtils.getExtProps;
 import static org.dita.dost.util.URLUtils.stripFragment;
 import static org.dita.dost.util.URLUtils.toURI;
 import static org.dita.dost.util.XMLUtils.close;
@@ -62,9 +55,6 @@ public class MapBranchFilterModule extends AbstractBranchFilterModule {
 
     /** Current map being processed, relative to temporary directory */
     private URI map;
-
-    /** Absolute path for filter file. */
-    private URI ditavalFile;
 
     public MapBranchFilterModule() {
         builder = XMLUtils.getDocumentBuilder();
@@ -93,7 +83,6 @@ public class MapBranchFilterModule extends AbstractBranchFilterModule {
     protected void processMap(final FileInfo fi) {
         map = fi.uri;
         currentFile = job.tempDirURI.resolve(map);
-        ditavalFile = Optional.of(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL)).filter(File::exists).map(File::toURI).orElse(null);
 
         logger.info("Processing " + currentFile);
         final Document doc;
@@ -112,24 +101,18 @@ public class MapBranchFilterModule extends AbstractBranchFilterModule {
     }
 
     private void splitBranches(Document doc) {
-        long ref = System.currentTimeMillis();
         logger.debug("Split branches and generate copy-to");
         splitBranches(doc.getDocumentElement(), Branch.EMPTY);
-        logger.info("Runtime branch splitting: {0}ms", System.currentTimeMillis()-ref);
     }
 
     private void filterBranches(Document doc) {
-        long ref = System.currentTimeMillis();
         logger.debug("Filter map");
-        filterBranches(doc.getDocumentElement());
-        logger.info("Runtime filter branches: {0}ms", System.currentTimeMillis()-ref);
+        new BranchFilter(logger, currentFile).filterBranches(doc.getDocumentElement());
     }
 
     private void rewriteDuplicates(Document doc) {
-        long ref = System.currentTimeMillis();
         logger.debug("Rewrite duplicate topic references");
         rewriteDuplicates(doc.getDocumentElement());
-        logger.info("Runtime rewrite duplicates: {0}ms", System.currentTimeMillis()-ref);
     }
 
     private void writeDocumentToDisk(Document doc) {
@@ -283,59 +266,6 @@ public class MapBranchFilterModule extends AbstractBranchFilterModule {
         return formatAttr == null ||
                 ATTR_FORMAT_VALUE_DITA.equals(formatAttr.getNodeValue()) ||
                 ATTR_FORMAT_VALUE_DITAMAP.equals(formatAttr.getNodeValue());
-    }
-
-    /** Filter map and remove excluded content. */
-    private void filterBranches(final Element root) {
-        final QName[][] props = getExtProps(root.getAttribute(ATTRIBUTE_NAME_DOMAINS));
-        final SubjectScheme subjectSchemeMap = getSubjectScheme(root);
-        final List<FilterUtils> baseFilter = getBaseFilter(subjectSchemeMap);
-        filterBranches(root, baseFilter, props, subjectSchemeMap);
-    }
-
-    private List<FilterUtils> getBaseFilter(final SubjectScheme subjectSchemeMap) {
-        if (ditavalFile != null && !subjectSchemeMap.isEmpty()) {
-            final FilterUtils f = getFilterUtils(ditavalFile).refine(subjectSchemeMap);
-            return singletonList(f);
-        }
-        return Collections.emptyList();
-    }
-
-    private void filterBranches(final Element elem, final List<FilterUtils> filters, final QName[][] props,
-                                final SubjectScheme subjectSchemeMap) {
-        final List<FilterUtils> fs = combineFilterUtils(elem, filters, subjectSchemeMap);
-
-        boolean exclude = false;
-        for (final FilterUtils f: fs) {
-            exclude = f.needsExclusion(elem, props);
-            if (exclude) {
-                break;
-            }
-        }
-
-        if (exclude) {
-            elem.getParentNode().removeChild(elem);
-        } else {
-            final List<Element> childElements = getChildElements(elem);
-            final Set<Flag> flags = fs.stream()
-                    .flatMap(f -> f.getFlags(elem, props).stream())
-                    .map(f -> f.adjustPath(currentFile, job))
-                    .collect(Collectors.toSet());
-            for (Flag flag : flags) {
-                final Element startElement = (Element) elem.getOwnerDocument().importNode(flag.getStartFlag(), true);
-                final Node firstChild = elem.getFirstChild();
-                if (firstChild != null) {
-                    elem.insertBefore(startElement, firstChild);
-                } else {
-                    elem.appendChild(startElement);
-                }
-                final Element endElement = (Element) elem.getOwnerDocument().importNode(flag.getEndFlag(), true);
-                elem.appendChild(endElement);
-            }
-            for (final Element child : childElements) {
-                filterBranches(child, fs, props, subjectSchemeMap);
-            }
-        }
     }
 
     /**

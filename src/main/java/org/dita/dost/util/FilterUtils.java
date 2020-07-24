@@ -8,17 +8,33 @@
  */
 package org.dita.dost.util;
 
-import static java.lang.String.format;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
-import static javax.xml.XMLConstants.NULL_NS_URI;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.StringUtils.isEmptyString;
-import static org.dita.dost.util.StringUtils.notEmpty;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import org.apache.commons.io.input.BOMInputStream;
+import org.dita.dost.log.DITAOTLogger;
+import org.dita.dost.log.MessageUtils;
+import org.dita.dost.module.filter.SubjectScheme;
+import org.dita.dost.util.Job.FileInfo;
+import org.w3c.dom.*;
+import org.xml.sax.*;
 
+import javax.xml.namespace.QName;
+import javax.xml.stream.XMLEventReader;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.sax.SAXSource;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -27,28 +43,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-
-import org.dita.dost.log.DITAOTLogger;
-import org.dita.dost.log.MessageUtils;
-
-import org.dita.dost.module.filter.SubjectScheme;
-import org.dita.dost.util.Job.FileInfo;
-import org.w3c.dom.*;
-import org.xml.sax.*;
-
-import javax.xml.namespace.QName;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMResult;
-import javax.xml.transform.sax.SAXSource;
+import static java.lang.String.format;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static javax.xml.XMLConstants.NULL_NS_URI;
+import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.StringUtils.isEmptyString;
+import static org.dita.dost.util.StringUtils.notEmpty;
 
 /**
  * Utility class used for flagging and filtering.
@@ -57,22 +58,35 @@ import javax.xml.transform.sax.SAXSource;
  */
 public class FilterUtils {
 
-    /** Subject scheme file extension */
+    /**
+     * Subject scheme file extension
+     */
     public static final String SUBJECT_SCHEME_EXTENSION = ".subm";
+
     public static final FilterKey DEFAULT = new FilterKey(QName.valueOf(DEFAULT_ACTION), null);
+
+    /**
+     * Actions for filter keys.
+     */
+    private final Map<FilterKey, Action> filterMap;
+
+    /**
+     * Set of filter keys for which an error has already been thrown.
+     */
+    private final Set<FilterKey> notMappingRules = new HashSet<>();
+
+    private final String foregroundConflictColor;
+
+    private final String backgroundConflictColor;
+
+    private final Pattern groupPattern = Pattern.compile("(\\w+)\\((.*?)\\)");
 
     private DITAOTLogger logger;
 
-    /** Actions for filter keys. */
-    private final Map<FilterKey, Action> filterMap;
-    
-    /** Set of filter keys for which an error has already been thrown. */
-    private final Set<FilterKey> notMappingRules = new HashSet<>();
-    
     private boolean logMissingAction;
-    private final String foregroundConflictColor;
-    private final String backgroundConflictColor;
+
     private Set<QName> filterAttributes;
+
     private Set<QName> flagAttributes;
 
     public FilterUtils(final Map<FilterKey, Action> filterMap, String foregroundConflictColor,
@@ -129,15 +143,6 @@ public class FilterUtils {
         this.flagAttributes = Sets.union(this.flagAttributes, flagAttributes);
     }
 
-    public void setLogger(final DITAOTLogger logger) {
-        this.logger = logger;
-    }
-    
-    @Override
-    public String toString() {
-        return filterMap.toString();
-    }
-
     private static Set<QName> getProfileAttributes(final String conf) {
         final ImmutableSet.Builder<QName> res = ImmutableSet.<QName>builder()
                 .add(QName.valueOf(ATTRIBUTE_NAME_AUDIENCE),
@@ -165,7 +170,7 @@ public class FilterUtils {
                         QName.valueOf(ATTRIBUTE_NAME_PRINT),
                         QName.valueOf(ATTRIBUTE_NAME_DELIVERYTARGET),
                         QName.valueOf(ATTRIBUTE_NAME_REV)
-        );
+                );
         if (conf != null) {
             Stream.of(conf.trim().split("\\s*,\\s*"))
                     .map(QName::valueOf)
@@ -174,17 +179,26 @@ public class FilterUtils {
         return res.build();
     }
 
+    public void setLogger(final DITAOTLogger logger) {
+        this.logger = logger;
+    }
+
+    @Override
+    public String toString() {
+        return filterMap.toString();
+    }
+
     public Set<Flag> getFlags(final Attributes atts, final QName[][] extProps) {
         if (filterMap.isEmpty()) {
             return emptySet();
         }
 
         final Set<Flag> res = new HashSet<>();
-        for (final QName attr: flagAttributes) {
+        for (final QName attr : flagAttributes) {
             final String value = atts.getValue(attr.getNamespaceURI(), attr.getLocalPart());
             if (value != null) {
                 final Map<QName, List<String>> groups = getGroups(value);
-                for (Map.Entry<QName, List<String>> group: groups.entrySet()) {
+                for (Map.Entry<QName, List<String>> group : groups.entrySet()) {
                     final QName[] propList =
                             group.getKey() != null
                                     ? new QName[]{attr, group.getKey()}
@@ -246,7 +260,7 @@ public class FilterUtils {
     public Set<Flag> getFlags(final Element element, final QName[][] props) {
         final XMLUtils.AttributesBuilder buf = new XMLUtils.AttributesBuilder();
         final NamedNodeMap attrs = element.getAttributes();
-        for (int i = 0; i < attrs.getLength() ; i++) {
+        for (int i = 0; i < attrs.getLength(); i++) {
             final Node attr = attrs.item(i);
             if (attr.getNodeType() == Node.ATTRIBUTE_NODE) {
                 buf.add((Attr) attr);
@@ -282,34 +296,32 @@ public class FilterUtils {
      */
     public boolean needExclude(final Element element, final QName[][] props) {
         Attributes attributes = getAttributes(element);
-		return needExclude(attributes, props);
+        return needExclude(attributes, props);
     }
-    
+
     /***
      * Tests whether elements of maps/topics should be filtered out.
      * Filtered Keydefs are listed in the <code>.job.xml</code> file.
      */
     public boolean needsExclusion(final Element element, final QName[][] properties) {
         Attributes attributes = getAttributes(element);
-		if (needExclude(attributes, properties)) {
+        if (needExclude(attributes, properties)) {
             updateJobIfKeyFiltered(attributes);
             excludeReferencedTopic(element, properties, attributes);
-			return true;
-		}
+            return true;
+        }
 
-		return excludeReferencedTopic(element, properties, attributes);
+        return excludeReferencedTopic(element, properties, attributes);
     }
 
     private boolean excludeReferencedTopic(Element element, QName[][] properties, Attributes attributes) {
         String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
         if (isMapTopicRef(attributes) && notEmpty(href)) {
-            Optional<Element> referencedDocument = loadDocument(href);
-            if (!referencedDocument.isPresent()) {
+            Optional<Attributes> referencedAttributes = loadReferencedAttributes(href);
+            if (!referencedAttributes.isPresent()) {
                 return false;
             }
-
-            Attributes referencedAttributes = getAttributes(referencedDocument.get());
-            if (needExclude(referencedAttributes, properties)) {
+            if (needExclude(referencedAttributes.get(), properties)) {
                 updateFileInfo(href);
                 return isNotKeydef(attributes);
             }
@@ -317,74 +329,69 @@ public class FilterUtils {
         return false;
     }
 
-	Attributes getAttributes(final Element element) {
-		final XMLUtils.AttributesBuilder builder = new XMLUtils.AttributesBuilder();
+    Optional<Attributes> loadReferencedAttributes(String href) {
+        XmlStreams xmlStreams = new XmlStreams(logger);
+        BOMInputStream inputStream = null;
+        XMLEventReader eventReader = null;
+        try {
+            Path xmlFile = Paths.get(Job.instance.getFileInfo(new URI(href)).src);
+            inputStream = new BOMInputStream(new FileInputStream(xmlFile.toFile()), false);
+            eventReader = xmlStreams.initializeReader(inputStream);
+            return Optional.of(xmlStreams.collectRootAttributes(eventReader));
+        } catch (NullPointerException | URISyntaxException | FileNotFoundException | XMLStreamException e) {
+            logger.warn(format("Source document could not be loaded for %s. Cannot validate filtering attributes. Error message: %s", href, e.getMessage()));
+            return Optional.empty();
+        } finally {
+            xmlStreams.freeResources(eventReader, inputStream);
+        }
+    }
+
+    Attributes getAttributes(final Element element) {
+        final XMLUtils.AttributesBuilder builder = new XMLUtils.AttributesBuilder();
         final NamedNodeMap attrs = element.getAttributes();
-        for (int i = 0; i < attrs.getLength() ; i++) {
+        for (int i = 0; i < attrs.getLength(); i++) {
             final Node attr = attrs.item(i);
             if (attr.getNodeType() == Node.ATTRIBUTE_NODE) {
                 builder.add((Attr) attr);
             }
         }
         return builder.build();
-	}
-	
-	private boolean isMapTopicRef(Attributes attributes) {
-		return !DITAVAREF_D_DITAVALREF.matches(attributes) && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes));
-	}
-	
-	private boolean isNotKeydef(Attributes attributes) {
-		return !MAPGROUP_D_KEYDEF.matches(attributes);
-	}
+    }
 
-    private Optional<Element> loadDocument(String href) {
+    private boolean isMapTopicRef(Attributes attributes) {
+        return !DITAVAREF_D_DITAVALREF.matches(attributes) && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes));
+    }
+
+    private boolean isNotKeydef(Attributes attributes) {
+        return !MAPGROUP_D_KEYDEF.matches(attributes);
+    }
+
+    private void updateJobIfKeyFiltered(Attributes attributes) {
+        if (MAPGROUP_D_KEYDEF.matches(attributes)) {
+            if (attributes.getValue(ATTRIBUTE_NAME_KEYS) == null || attributes.getValue(ATTRIBUTE_NAME_HREF) == null) {
+                if (attributes.getValue(ATTRIBUTE_NAME_KEYREF) == null) {
+                    throw new IllegalArgumentException("Attribute" + ATTRIBUTE_NAME_KEYREF + "," + ATTRIBUTE_NAME_KEYS + " or " + ATTRIBUTE_NAME_HREF + " can not be null");
+                }
+            } else {
+                Job.instance.addFilteredKey(attributes.getValue(ATTRIBUTE_NAME_KEYS), attributes.getValue(ATTRIBUTE_NAME_HREF));
+            }
+        }
+    }
+
+    private void updateFileInfo(String href) {
         try {
-            Job job = Job.instance;
-            String absoluteHref = job.getFileInfo(new URI(href)).src.toString();
-            DocumentBuilder builder = newDocumentBuilder();
-            Document document = builder.parse(new InputSource(absoluteHref));
-            return Optional.of(document.getDocumentElement());
-        } catch (NullPointerException | SAXException | IOException | URISyntaxException | ParserConfigurationException e) {
-            logger.warn(format("Source document could not be loaded for %s. Cannot validate filtering attributes.", href));
-        }
-        return Optional.empty();
-    }
-
-	private DocumentBuilder newDocumentBuilder() throws ParserConfigurationException {
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		factory.setNamespaceAware(true);
-		factory.setValidating(false);
-		DocumentBuilder builder = factory.newDocumentBuilder();
-		builder.setEntityResolver(CatalogUtils.getCatalogResolver());
-		return builder;
-	}
-
-	private void updateJobIfKeyFiltered(Attributes attributes) {
-        if (MAPGROUP_D_KEYDEF.matches(attributes)) {        	
-        	if(attributes.getValue(ATTRIBUTE_NAME_KEYS)==null||attributes.getValue(ATTRIBUTE_NAME_HREF)==null) {
-        		if(attributes.getValue(ATTRIBUTE_NAME_KEYREF)==null) {
-        			throw new IllegalArgumentException("Attribute"+ATTRIBUTE_NAME_KEYREF+","+ATTRIBUTE_NAME_KEYS+" or "+ATTRIBUTE_NAME_HREF+" can not be null");
-        		}
-        	}else {
-        		Job.instance.addFilteredKey(attributes.getValue(ATTRIBUTE_NAME_KEYS), attributes.getValue(ATTRIBUTE_NAME_HREF));
-        	}
-        }
-    }
-
-	private void updateFileInfo(String href) {
-		try {
-			URI fileUri = new URI(href);
+            URI fileUri = new URI(href);
             FileInfo fileInfo = Job.instance.getFileInfo(fileUri);
-            fileInfo.isFiltered=true;
-		} catch (URISyntaxException | NullPointerException e) {
-			logger.warn(format("Couldn't update fileinfo %s", href));
-		}
-	}
+            fileInfo.isFiltered = true;
+        } catch (URISyntaxException | NullPointerException e) {
+            logger.warn(format("Couldn't update fileinfo %s", href));
+        }
+    }
 
     /**
      * Check if the given Attributes need to be excluded.
      *
-     * @param atts attributes
+     * @param atts     attributes
      * @param extProps {@code props} attribute specializations
      * @return {@code true} if any profiling attribute was excluded, otherwise {@code false}
      */
@@ -393,11 +400,11 @@ public class FilterUtils {
             return false;
         }
 
-        for (final QName attr: filterAttributes) {
+        for (final QName attr : filterAttributes) {
             final String value = atts.getValue(attr.getNamespaceURI(), attr.getLocalPart());
             if (value != null) {
                 final Map<QName, List<String>> groups = getGroups(value);
-                for (Map.Entry<QName, List<String>> group: groups.entrySet()) {
+                for (Map.Entry<QName, List<String>> group : groups.entrySet()) {
                     final QName[] propList =
                             group.getKey() != null
                                     ? new QName[]{attr, group.getKey()}
@@ -410,7 +417,7 @@ public class FilterUtils {
         }
 
         if (extProps != null && extProps.length != 0) {
-            for (final QName[] propList: extProps) {
+            for (final QName[] propList : extProps) {
                 int propListIndex = propList.length - 1;
                 final QName propName = propList[propListIndex];
                 String propValue = atts.getValue(propName.getNamespaceURI(), propName.getLocalPart());
@@ -429,14 +436,14 @@ public class FilterUtils {
     }
 
     public boolean extendedExclusionCheck(final Attributes attributes, final QName[][] extProps) {
-    	if (needExclude(attributes, extProps)) {
-    		return true;
-    	}
-    	
-    	return targetsFilteredFile(attributes);
+        if (needExclude(attributes, extProps)) {
+            return true;
+        }
+
+        return targetsFilteredFile(attributes);
     }
-    
-	boolean targetsFilteredFile(Attributes attributes) {
+
+    boolean targetsFilteredFile(Attributes attributes) {
         final String link = getLinkingAttribute(attributes);
         if (isEmptyString(link)) {
             return false;
@@ -452,11 +459,11 @@ public class FilterUtils {
             }
         }
 
-		Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.uri.toString().equals(link) && fileInfo.isFiltered);
-		return job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0;
-	}
+        Predicate<FileInfo> isFiltered = fileInfo -> (fileInfo.uri.toString().equals(link) && fileInfo.isFiltered);
+        return job.getFileInfo(isFiltered) != null && job.getFileInfo(isFiltered).size() > 0;
+    }
 
-	String matchFileName(String link) {
+    String matchFileName(String link) {
         String matchAllBeforeHashOrAll = "(.*?)(?=#|$)";
         Matcher matcher = Pattern.compile(matchAllBeforeHashOrAll).matcher(link);
         if (matcher.find()) {
@@ -466,18 +473,15 @@ public class FilterUtils {
     }
 
     /**
-     *
      * @return href value if it is not empty otherwise the conref attribute value, can be null
      */
-	String getLinkingAttribute(Attributes attributes) {
+    String getLinkingAttribute(Attributes attributes) {
         if (notEmpty(attributes.getValue(ATTRIBUTE_NAME_HREF))) {
             return attributes.getValue(ATTRIBUTE_NAME_HREF);
         }
 
         return attributes.getValue(ATTRIBUTE_NAME_CONREF);
     }
-	
-    private final Pattern groupPattern = Pattern.compile("(\\w+)\\((.*?)\\)");
 
     /**
      * Parse groups
@@ -492,7 +496,7 @@ public class FilterUtils {
         final StringBuilder buf = new StringBuilder();
         int previousEnd = 0;
         final Matcher m = groupPattern.matcher(value);
-        while(m.find()) {
+        while (m.find()) {
             buf.append(value.subSequence(previousEnd, m.start()));
             final String v = m.group(2);
             if (!v.trim().isEmpty()) {
@@ -517,7 +521,7 @@ public class FilterUtils {
     /**
      * Get labelled props value.
      *
-     * @param propName attribute name
+     * @param propName       attribute name
      * @param attrPropsValue attribute value
      * @return props value, {@code null} if not available
      */
@@ -552,7 +556,7 @@ public class FilterUtils {
             checkRuleMapping(attName, attValue);
             boolean hasNonExcludeAction = false;
             boolean hasExcludeAction = false;
-            for (final String attSubValue: attValue) {
+            for (final String attSubValue : attValue) {
                 final FilterKey filterKey = new FilterKey(attName, attSubValue);
                 final Action filterAction = filterMap.get(filterKey);
                 // no action will be considered as 'not exclude'
@@ -595,7 +599,7 @@ public class FilterUtils {
                     // the ancient parent on the top level
                     return isDefaultExclude();
                 }
-            // if all of the value should be excluded
+                // if all of the value should be excluded
             } else if (hasExcludeAction) {
                 return true;
             }
@@ -612,14 +616,15 @@ public class FilterUtils {
 
     /**
      * Check if attribute value has mapping in filter configuration and throw messages.
-     * @param attName attribute name
+     *
+     * @param attName  attribute name
      * @param attValue attribute value
      */
     private void checkRuleMapping(final QName attName, final List<String> attValue) {
         if (attValue == null || attValue.isEmpty()) {
             return;
         }
-        for (final String attSubValue: attValue) {
+        for (final String attSubValue : attValue) {
             final FilterKey filterKey = new FilterKey(attName, attSubValue);
             final Action filterAction = filterMap.get(filterKey);
             if (filterAction == null && logMissingAction) {
@@ -639,14 +644,151 @@ public class FilterUtils {
     }
 
     /**
+     * Refine filter with subject scheme.
+     *
+     * @param bindingMap subject scheme bindings
+     * @return new filter with subject scheme information
+     */
+    public FilterUtils refine(final SubjectScheme bindingMap) {
+        return refine(bindingMap.subjectSchemeMap);
+    }
+
+    // Subject scheme support
+
+    /**
+     * Refine filter with subject scheme.
+     *
+     * @param bindingMap subject scheme bindings, {@code Map<AttName, Map<ElemName, Set<Element>>>}
+     * @return new filter with subject scheme information
+     */
+    private FilterUtils refine(final Map<QName, Map<String, Set<Element>>> bindingMap) {
+        if (bindingMap != null && !bindingMap.isEmpty()) {
+            final Map<FilterKey, Action> buf = new HashMap<>(filterMap);
+            for (final Map.Entry<FilterKey, Action> e : filterMap.entrySet()) {
+                refineAction(e.getValue(), e.getKey(), bindingMap, buf);
+            }
+            final FilterUtils filterUtils = new FilterUtils(buf, foregroundConflictColor, backgroundConflictColor);
+            filterUtils.setLogger(logger);
+            filterUtils.logMissingAction = logMissingAction;
+            return filterUtils;
+        } else {
+            return this;
+        }
+    }
+
+    /**
+     * Refine action key with information from subject schemes.
+     */
+    private void refineAction(final Action action, final FilterKey key, final Map<QName, Map<String, Set<Element>>> bindingMap,
+                              final Map<FilterKey, Action> destFilterMap) {
+        if (key.value != null) {
+            final Map<String, Set<Element>> schemeMap = bindingMap.get(key.attribute);
+            if (schemeMap != null && !schemeMap.isEmpty()) {
+                for (final Set<Element> submap : schemeMap.values()) {
+                    for (final Element e : submap) {
+                        final Element subRoot = searchForKey(e, key.value);
+                        if (subRoot != null) {
+                            insertAction(subRoot, key.attribute, action, destFilterMap);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Search subject scheme elements for a given key
+     *
+     * @param root     subject scheme element tree to search through
+     * @param keyValue key to locate
+     * @return element that matches the key, otherwise {@code null}
+     */
+    private Element searchForKey(final Element root, final String keyValue) {
+        if (root == null || keyValue == null) {
+            return null;
+        }
+        final LinkedList<Element> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            final Element node = queue.removeFirst();
+            final NodeList children = node.getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
+                    queue.add((Element) children.item(i));
+                }
+            }
+            if (SUBJECTSCHEME_SUBJECTDEF.matches(node)) {
+                final String key = node.getAttribute(ATTRIBUTE_NAME_KEYS);
+                if (keyValue.equals(key)) {
+                    return node;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Insert subject scheme based action into filetermap if key not present in the map
+     *
+     * @param subTree subject scheme definition element
+     * @param attName attribute name
+     * @param action  action to insert
+     */
+    private void insertAction(final Element subTree, final QName attName, final Action action, final Map<FilterKey, Action> destFilterMap) {
+        if (subTree == null || action == null) {
+            return;
+        }
+
+        final LinkedList<Element> queue = new LinkedList<>();
+
+        // Skip the sub-tree root because it has been added already.
+        NodeList children = subTree.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
+                queue.offer((Element) children.item(i));
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            final Element node = queue.poll();
+            children = node.getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
+                    queue.offer((Element) children.item(i));
+                }
+            }
+            if (SUBJECTSCHEME_SUBJECTDEF.matches(node)) {
+                final String key = node.getAttribute(ATTRIBUTE_NAME_KEYS);
+                if (key != null && !key.trim().isEmpty()) {
+                    final FilterKey k = new FilterKey(attName, key);
+                    if (!destFilterMap.containsKey(k)) {
+                        destFilterMap.put(k, action);
+                    }
+                }
+            }
+        }
+    }
+
+    public interface Action {
+        Action INCLUDE = new Include();
+        Action EXCLUDE = new Exclude();
+        Action PASSTHROUGH = new Passthrough();
+    }
+
+    /**
      * Filter key object.
      *
      * @since 1.6
      */
     public static class FilterKey {
-        /** Attribute name */
+        /**
+         * Attribute name
+         */
         public final QName attribute;
-        /** Attribute value, may be {@code null} */
+
+        /**
+         * Attribute value, may be {@code null}
+         */
         public final String value;
 
         public FilterKey(final QName attribute, final String value) {
@@ -699,135 +841,6 @@ public class FilterUtils {
         }
     }
 
-    // Subject scheme support
-
-    /**
-     * Refine filter with subject scheme.
-     *
-     * @param bindingMap subject scheme bindings
-     * @return new filter with subject scheme information
-     */
-    public FilterUtils refine(final SubjectScheme bindingMap) {
-        return refine(bindingMap.subjectSchemeMap);
-    }
-
-    /**
-     * Refine filter with subject scheme.
-     *
-     * @param bindingMap subject scheme bindings, {@code Map<AttName, Map<ElemName, Set<Element>>>}
-     * @return new filter with subject scheme information
-     */
-    private FilterUtils refine(final Map<QName, Map<String, Set<Element>>> bindingMap) {
-        if (bindingMap != null && !bindingMap.isEmpty()) {
-            final Map<FilterKey, Action> buf = new HashMap<>(filterMap);
-            for (final Map.Entry<FilterKey, Action> e: filterMap.entrySet()) {
-                refineAction(e.getValue(), e.getKey(), bindingMap, buf);
-            }
-            final FilterUtils filterUtils = new FilterUtils(buf, foregroundConflictColor, backgroundConflictColor);
-            filterUtils.setLogger(logger);
-            filterUtils.logMissingAction = logMissingAction;
-            return filterUtils;
-        } else {
-            return this;
-        }
-    }
-    /**
-     * Refine action key with information from subject schemes.
-     */
-    private void refineAction(final Action action, final FilterKey key, final Map<QName, Map<String, Set<Element>>> bindingMap,
-                              final Map<FilterKey, Action> destFilterMap) {
-        if (key.value != null) {
-            final Map<String, Set<Element>> schemeMap = bindingMap.get(key.attribute);
-            if (schemeMap != null && !schemeMap.isEmpty()) {
-                for (final Set<Element> submap: schemeMap.values()) {
-                    for (final Element e: submap) {
-                        final Element subRoot = searchForKey(e, key.value);
-                        if (subRoot != null) {
-                            insertAction(subRoot, key.attribute, action, destFilterMap);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    /**
-     * Search subject scheme elements for a given key
-     * @param root subject scheme element tree to search through
-     * @param keyValue key to locate
-     * @return element that matches the key, otherwise {@code null}
-     */
-    private Element searchForKey(final Element root, final String keyValue) {
-        if (root == null || keyValue == null) {
-            return null;
-        }
-        final LinkedList<Element> queue = new LinkedList<>();
-        queue.add(root);
-        while (!queue.isEmpty()) {
-            final Element node = queue.removeFirst();
-            final NodeList children = node.getChildNodes();
-            for (int i = 0; i < children.getLength(); i++) {
-                if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
-                    queue.add((Element)children.item(i));
-                }
-            }
-            if (SUBJECTSCHEME_SUBJECTDEF.matches(node)) {
-                final String key = node.getAttribute(ATTRIBUTE_NAME_KEYS);
-                if (keyValue.equals(key)) {
-                    return node;
-                }
-            }
-        }
-        return null;
-    }
-    /**
-     * Insert subject scheme based action into filetermap if key not present in the map
-     *
-     * @param subTree subject scheme definition element
-     * @param attName attribute name
-     * @param action action to insert
-     */
-    private void insertAction(final Element subTree, final QName attName, final Action action, final Map<FilterKey, Action> destFilterMap) {
-        if (subTree == null || action == null) {
-            return;
-        }
-
-        final LinkedList<Element> queue = new LinkedList<>();
-
-        // Skip the sub-tree root because it has been added already.
-        NodeList children = subTree.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
-                queue.offer((Element)children.item(i));
-            }
-        }
-
-        while (!queue.isEmpty()) {
-            final Element node = queue.poll();
-            children = node.getChildNodes();
-            for (int i = 0; i < children.getLength(); i++) {
-                if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
-                    queue.offer((Element)children.item(i));
-                }
-            }
-            if (SUBJECTSCHEME_SUBJECTDEF.matches(node)) {
-                final String key = node.getAttribute(ATTRIBUTE_NAME_KEYS);
-                if (key != null && !key.trim().isEmpty()) {
-                    final FilterKey k = new FilterKey(attName, key);
-                    if (!destFilterMap.containsKey(k)) {
-                        destFilterMap.put(k, action);
-                    }
-                }
-            }
-        }
-    }
-
-
-    public interface Action {
-        Action INCLUDE = new Include();
-        Action EXCLUDE = new Exclude();
-        Action PASSTHROUGH = new Passthrough();
-    }
-
     public static class Include implements Action {
         @Override
         public String toString() {
@@ -852,15 +865,21 @@ public class FilterUtils {
     public static class Flag implements Action {
 
         public final String proptype;
+
         public final String color;
+
         public final String backcolor;
+
         public final String[] style;
+
         public final String changebar;
+
         public final FlagImage startflag;
+
         public final FlagImage endflag;
 
         public Flag(String proptype, String color, String backcolor, String[] style, String changebar,
-                FlagImage startflag, FlagImage endflag) {
+                    FlagImage startflag, FlagImage endflag) {
             this.proptype = proptype;
             this.color = color;
             this.backcolor = backcolor;
@@ -868,6 +887,93 @@ public class FilterUtils {
             this.changebar = changebar;
             this.startflag = startflag;
             this.endflag = endflag;
+        }
+
+        private static Element writeToElement(final Consumer<ContentHandler> writer) {
+            final TransformerFactory factory = TransformerFactory.newInstance();
+            final Transformer transformer;
+            try {
+                transformer = factory.newTransformer();
+            } catch (TransformerConfigurationException e) {
+                throw new RuntimeException(e);
+            }
+            final SAXSource xmlSource = new SAXSource(new XMLReader() {
+                private ContentHandler contentHandler;
+
+                @Override
+                public boolean getFeature(String name) throws SAXNotRecognizedException, SAXNotSupportedException {
+                    return false;
+                }
+
+                @Override
+                public void setFeature(String name, boolean value) throws SAXNotRecognizedException, SAXNotSupportedException {
+                }
+
+                @Override
+                public Object getProperty(String name) throws SAXNotRecognizedException, SAXNotSupportedException {
+                    return null;
+                }
+
+                @Override
+                public void setProperty(String name, Object value) throws SAXNotRecognizedException, SAXNotSupportedException {
+                }
+
+                @Override
+                public EntityResolver getEntityResolver() {
+                    return null;
+                }
+
+                @Override
+                public void setEntityResolver(EntityResolver resolver) {
+                }
+
+                @Override
+                public DTDHandler getDTDHandler() {
+                    return null;
+                }
+
+                @Override
+                public void setDTDHandler(DTDHandler handler) {
+                }
+
+                @Override
+                public ContentHandler getContentHandler() {
+                    return contentHandler;
+                }
+
+                @Override
+                public void setContentHandler(ContentHandler handler) {
+                    this.contentHandler = handler;
+                }
+
+                @Override
+                public ErrorHandler getErrorHandler() {
+                    return null;
+                }
+
+                @Override
+                public void setErrorHandler(ErrorHandler handler) {
+                }
+
+                @Override
+                public void parse(InputSource input) throws IOException, SAXException {
+                    parse((String) null);
+                }
+
+                @Override
+                public void parse(String input) throws IOException, SAXException {
+                    getContentHandler().startDocument();
+                    writer.accept(getContentHandler());
+                    getContentHandler().endDocument();
+                }
+            }, null);
+            final DOMResult outputTarget = new DOMResult();
+            try {
+                transformer.transform(xmlSource, outputTarget);
+            } catch (TransformerException e) {
+                throw new RuntimeException(e);
+            }
+            return ((Document) outputTarget.getNode()).getDocumentElement();
         }
 
         public Flag adjustPath(final URI currentFile, final Job job) {
@@ -985,79 +1091,6 @@ public class FilterUtils {
             });
         }
 
-        private static Element writeToElement(final Consumer<ContentHandler> writer) {
-            final TransformerFactory factory = TransformerFactory.newInstance();
-            final Transformer transformer;
-            try {
-                transformer = factory.newTransformer();
-            } catch (TransformerConfigurationException e) {
-                throw new RuntimeException(e);
-            }
-            final SAXSource xmlSource = new SAXSource(new XMLReader() {
-                @Override
-                public boolean getFeature(String name) throws SAXNotRecognizedException, SAXNotSupportedException {
-                    return false;
-                }
-                @Override
-                public void setFeature(String name, boolean value) throws SAXNotRecognizedException, SAXNotSupportedException {
-                }
-                @Override
-                public Object getProperty(String name) throws SAXNotRecognizedException, SAXNotSupportedException {
-                    return null;
-                }
-                @Override
-                public void setProperty(String name, Object value) throws SAXNotRecognizedException, SAXNotSupportedException {
-                }
-                @Override
-                public void setEntityResolver(EntityResolver resolver) {
-                }
-                @Override
-                public EntityResolver getEntityResolver() {
-                    return null;
-                }
-                @Override
-                public void setDTDHandler(DTDHandler handler) {
-                }
-                @Override
-                public DTDHandler getDTDHandler() {
-                    return null;
-                }
-                private ContentHandler contentHandler;
-                @Override
-                public void setContentHandler(ContentHandler handler) {
-                    this.contentHandler = handler;
-                }
-                @Override
-                public ContentHandler getContentHandler() {
-                    return contentHandler;
-                }
-                @Override
-                public void setErrorHandler(ErrorHandler handler) {
-                }
-                @Override
-                public ErrorHandler getErrorHandler() {
-                    return null;
-                }
-                @Override
-                public void parse(InputSource input) throws IOException, SAXException {
-                    parse((String) null);
-                }
-                @Override
-                public void parse(String input) throws IOException, SAXException {
-                    getContentHandler().startDocument();
-                    writer.accept(getContentHandler());
-                    getContentHandler().endDocument();
-                }
-            }, null);
-            final DOMResult outputTarget = new DOMResult();
-            try {
-                transformer.transform(xmlSource, outputTarget);
-            } catch (TransformerException e) {
-                throw new RuntimeException(e);
-            }
-            return ((Document) outputTarget.getNode()).getDocumentElement();
-        }
-
         @Override
         public String toString() {
             return "Flag{" +
@@ -1099,6 +1132,7 @@ public class FilterUtils {
 
         public static class FlagImage {
             public final URI href;
+
             public final String alt;
 
             public FlagImage(URI href, String alt) {
