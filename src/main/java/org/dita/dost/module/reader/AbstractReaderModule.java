@@ -318,7 +318,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         }
         validateMap = Collections.emptyMap();
         defaultValueMap = Collections.emptyMap();
-        logger.info("Processing " + currentFile + " to " + outputFile.toURI());
+        logger.debug("Processing " + currentFile + " to " + outputFile.toURI());
         final String[] params = { currentFile.toString() };
 
         // Verify stub for current file is in Job
