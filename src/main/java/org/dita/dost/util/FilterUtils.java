@@ -15,6 +15,7 @@ import org.apache.commons.io.input.BOMInputStream;
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.log.MessageUtils;
 import org.dita.dost.module.filter.SubjectScheme;
+import org.dita.dost.reader.DitaValReader;
 import org.dita.dost.util.Job.FileInfo;
 import org.w3c.dom.*;
 import org.xml.sax.*;
@@ -141,6 +142,19 @@ public class FilterUtils {
         this(isPrintType, filterMap, foregroundConflictColor, backgroundConflictColor);
         this.filterAttributes = Sets.union(this.filterAttributes, filterAttributes);
         this.flagAttributes = Sets.union(this.flagAttributes, flagAttributes);
+    }
+
+    /**
+     * Factory method to create a FilterUtils object for a ditaval
+     */
+    public static FilterUtils newFilterUtils(URI ditaval, DITAOTLogger logger) {
+        logger.info("Reading " + ditaval);
+        DitaValReader ditaValReader = new DitaValReader();
+        ditaValReader.read(ditaval);
+        Map<FilterUtils.FilterKey, FilterUtils.Action> filterMap = ditaValReader.getFilterMap();
+        FilterUtils f = new FilterUtils(filterMap, ditaValReader.getForegroundConflictColor(), ditaValReader.getBackgroundConflictColor());
+        f.setLogger(logger);
+        return f;
     }
 
     private static Set<QName> getProfileAttributes(final String conf) {

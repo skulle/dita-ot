@@ -107,7 +107,7 @@ public class MapBranchFilterModule extends AbstractBranchFilterModule {
 
     private void filterBranches(Document doc) {
         logger.debug("Filter map");
-        new BranchFilter(logger, currentFile).filterBranches(doc.getDocumentElement());
+        new MapBranchFilter(logger, currentFile).filterBranches(doc.getDocumentElement());
     }
 
     private void rewriteDuplicates(Document doc) {

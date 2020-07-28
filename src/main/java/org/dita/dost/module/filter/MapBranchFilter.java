@@ -1,7 +1,6 @@
 package org.dita.dost.module.filter;
 
 import org.dita.dost.log.DITAOTLogger;
-import org.dita.dost.reader.DitaValReader;
 import org.dita.dost.reader.SubjectSchemeReader;
 import org.dita.dost.util.FilterUtils;
 import org.dita.dost.util.FilterUtils.Flag;
@@ -17,11 +16,12 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.FilterUtils.newFilterUtils;
 import static org.dita.dost.util.StringUtils.getExtProps;
 import static org.dita.dost.util.URLUtils.toURI;
 import static org.dita.dost.util.XMLUtils.*;
 
-public class BranchFilter {
+public class MapBranchFilter {
 
     private final Map<URI, FilterUtils> filterCache = new HashMap<>();
 
@@ -37,16 +37,7 @@ public class BranchFilter {
 
     private Deque<MapBranch> elements = new ArrayDeque<>();
 
-    private static class MapBranch {
-        Element element;
-        List<FilterUtils> filter;
-        public MapBranch(Element element, List<FilterUtils> filter) {
-            this.element = element;
-            this.filter = filter;
-        }
-    }
-
-    public BranchFilter(DITAOTLogger logger, URI currentFile) {
+    public MapBranchFilter(DITAOTLogger logger, URI currentFile) {
         this.logger = logger;
         this.currentFile = currentFile;
     }
@@ -78,20 +69,10 @@ public class BranchFilter {
     private List<FilterUtils> getBaseFilter(final SubjectScheme subjectSchemeMap) {
         URI ditavalFile = Optional.of(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL)).filter(File::exists).map(File::toURI).orElse(null);
         if (ditavalFile != null && !subjectSchemeMap.isEmpty()) {
-            final FilterUtils f = getFilterUtils(ditavalFile).refine(subjectSchemeMap);
+            final FilterUtils f = newFilterUtils(ditavalFile, logger).refine(subjectSchemeMap);
             return singletonList(f);
         }
         return Collections.emptyList();
-    }
-
-    FilterUtils getFilterUtils(final URI ditaval) {
-        logger.info("Reading " + ditaval);
-        DitaValReader ditaValReader = new DitaValReader();
-        ditaValReader.read(ditaval);
-        Map<FilterUtils.FilterKey, FilterUtils.Action> filterMap = ditaValReader.getFilterMap();
-        FilterUtils f = new FilterUtils(filterMap, ditaValReader.getForegroundConflictColor(), ditaValReader.getBackgroundConflictColor());
-        f.setLogger(logger);
-        return f;
     }
 
     private FilterUtils getFilterUtils(final Element ditavalRef) {
@@ -99,7 +80,7 @@ public class BranchFilter {
         final URI tmp = currentFile.resolve(href);
         final Job.FileInfo fi = job.getFileInfo(tmp);
         final URI ditaval = fi.src;
-        return filterCache.computeIfAbsent(ditaval, this::getFilterUtils);
+        return filterCache.computeIfAbsent(ditaval, key -> newFilterUtils(key, logger));
     }
 
     private boolean exclude(Element element, QName[][] props, List<FilterUtils> filterUtils) {
@@ -127,7 +108,7 @@ public class BranchFilter {
                 continue;
             }
 
-            getChildElements(element).forEach(child ->  elements.push(new MapBranch(child, new ArrayList<>(filterUtils))));
+            getChildElements(element).forEach(child -> elements.push(new MapBranch(child, new ArrayList<>(filterUtils))));
 
             Set<Flag> flags = collectFlags(element, filterUtils);
             flags.forEach(flag -> addStartEndFlagElement(element, flag));
@@ -155,9 +136,9 @@ public class BranchFilter {
 
     private Set<Flag> collectFlags(Element element, List<FilterUtils> filterUtils) {
         return filterUtils.stream()
-                    .flatMap(f -> f.getFlags(element, domains).stream())
-                    .map(f -> f.adjustPath(currentFile, job))
-                    .collect(Collectors.toSet());
+                .flatMap(f -> f.getFlags(element, domains).stream())
+                .map(f -> f.adjustPath(currentFile, job))
+                .collect(Collectors.toSet());
     }
 
     List<FilterUtils> combineFilterUtils(Element element, List<FilterUtils> filters) {
@@ -170,6 +151,17 @@ public class BranchFilter {
                     return fs;
                 })
                 .orElse(filters);
+    }
+
+    private static class MapBranch {
+        Element element;
+
+        List<FilterUtils> filter;
+
+        public MapBranch(Element element, List<FilterUtils> filter) {
+            this.element = element;
+            this.filter = filter;
+        }
     }
 
 }

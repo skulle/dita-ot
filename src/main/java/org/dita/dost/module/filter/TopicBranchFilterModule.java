@@ -13,10 +13,8 @@ import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.util.FilterUtils;
 import org.dita.dost.util.Job.FileInfo;
-import org.dita.dost.util.URLUtils;
 import org.dita.dost.util.XMLUtils;
 import org.dita.dost.writer.ProfilingFilter;
-import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
@@ -30,11 +28,13 @@ import javax.xml.transform.stream.StreamResult;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.XMLUtils.*;
+import static org.dita.dost.util.XMLUtils.close;
+import static org.dita.dost.util.XMLUtils.getChildElements;
 
 /**
  * Branch filter module for topics.
@@ -49,14 +49,13 @@ import static org.dita.dost.util.XMLUtils.*;
  */
 public final class TopicBranchFilterModule extends AbstractBranchFilterModule {
 
-    private static final String SKIP_FILTER = "skip-filter";
+    public static final String SKIP_FILTER = "skip-filter";
     private static final String BRANCH_COPY_TO = "filter-copy-to";
 
     private final XMLUtils xmlUtils = new XMLUtils();
     private final DocumentBuilder builder;
     /** Current map being processed, relative to temporary directory */
     private URI map;
-    private final Set<URI> filtered = new HashSet<>();
 
     public TopicBranchFilterModule() {
         super();
@@ -104,10 +103,15 @@ public final class TopicBranchFilterModule extends AbstractBranchFilterModule {
         }
 
         final SubjectScheme subjectSchemeMap = getSubjectScheme(doc.getDocumentElement());
+
         logger.debug("Filter topics and generate copies");
         generateCopies(doc.getDocumentElement(), Collections.emptyList(), subjectSchemeMap);
+
+        long ref = System.currentTimeMillis();
         logger.debug("Filter existing topics");
-        filterTopics(doc.getDocumentElement(), Collections.emptyList(), subjectSchemeMap);
+        TopicBranchFilter topicFilter = new TopicBranchFilter(logger, map);
+        topicFilter.filterTopics(doc.getDocumentElement(), subjectSchemeMap);
+        logger.info("filter runtime: {0}", System.currentTimeMillis()-ref);
 
         logger.debug("Writing " + currentFile);
         Result result = null;
@@ -179,45 +183,6 @@ public final class TopicBranchFilterModule extends AbstractBranchFilterModule {
                 continue;
             }
             generateCopies(child, fs, subjectSchemeMap);
-        }
-    }
-
-    /** Modify and filter topics for branches. These files use an existing file name. */
-    private void filterTopics(final Element topicref, final List<FilterUtils> filters,
-                              final SubjectScheme subjectSchemeMap) {
-        final List<FilterUtils> fs = combineFilterUtils(topicref, filters, subjectSchemeMap);
-
-        final String href = topicref.getAttribute(ATTRIBUTE_NAME_HREF);
-        final Attr skipFilter = topicref.getAttributeNode(SKIP_FILTER);
-        final URI srcAbsUri = job.tempDirURI.resolve(map.resolve(href));
-        if (!fs.isEmpty() && skipFilter == null
-                && !filtered.contains(srcAbsUri)
-                && !href.isEmpty()
-                && !ATTR_SCOPE_VALUE_EXTERNAL.equals(topicref.getAttribute(ATTRIBUTE_NAME_SCOPE))) {
-            final ProfilingFilter writer = new ProfilingFilter();
-            writer.setLogger(logger);
-            writer.setJob(job);
-            writer.setFilterUtils(fs);
-            writer.setCurrentFile(srcAbsUri);
-            final List<XMLFilter> pipe = singletonList(writer);
-
-            logger.info("Filtering " + srcAbsUri);
-            try {
-            	xmlUtils.transform(URLUtils.stripFragment(srcAbsUri), pipe);
-            } catch (final DITAOTException e) {
-                logger.error("Failed to filter " + srcAbsUri + ": " + e.getMessage(), e);
-            }
-            filtered.add(srcAbsUri);
-        }
-        if (skipFilter != null) {
-            topicref.removeAttributeNode(skipFilter);
-        }
-
-        for (final Element child: getChildElements(topicref, MAP_TOPICREF)) {
-            if (DITAVAREF_D_DITAVALREF.matches(child)) {
-                continue;
-            }
-            filterTopics(child, fs, subjectSchemeMap);
         }
     }
 
