@@ -8,70 +8,17 @@
  */
 package org.dita.dost.module;
 
-import static java.lang.String.format;
-import static java.lang.System.currentTimeMillis;
-import static java.nio.file.Files.exists;
-import static java.util.stream.Collectors.toMap;
-import static org.dita.dost.util.Configuration.configuration;
-import static org.dita.dost.util.Constants.ANT_INVOKER_EXT_PARAM_TRANSTYPE;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREF;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_CONREFEND;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_COPY_TO;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_DITA_OT_ORIG_HREF;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_HREF;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_KEYSCOPE;
-import static org.dita.dost.util.Constants.ATTRIBUTE_NAME_PROCESSING_ROLE;
-import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITA;
-import static org.dita.dost.util.Constants.ATTR_FORMAT_VALUE_DITAMAP;
-import static org.dita.dost.util.Constants.ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY;
-import static org.dita.dost.util.Constants.INDEX_TYPE_ECLIPSEHELP;
-import static org.dita.dost.util.Constants.MAP_TOPICREF;
-import static org.dita.dost.util.Constants.SUBMAP;
-import static org.dita.dost.util.Job.KEYDEF_LIST_FILE;
-import static org.dita.dost.util.URLUtils.addSuffix;
-import static org.dita.dost.util.URLUtils.setFragment;
-import static org.dita.dost.util.URLUtils.stripFragment;
-import static org.dita.dost.util.XMLUtils.close;
-import static org.dita.dost.util.XMLUtils.getChildElements;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.xml.transform.Result;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.KeyrefReader;
-import org.dita.dost.util.DelayConrefUtils;
-import org.dita.dost.util.Job;
+import org.dita.dost.util.*;
 import org.dita.dost.util.Job.FileInfo;
-import org.dita.dost.util.KeyDef;
-import org.dita.dost.util.KeyScope;
-import org.dita.dost.util.KeyScopeSerializer;
-import org.dita.dost.util.KeydefDeserializer;
-import org.dita.dost.util.XMLUtils;
 import org.dita.dost.writer.ConkeyrefFilter;
 import org.dita.dost.writer.KeyrefPaser;
 import org.dita.dost.writer.TopicFragmentFilter;
@@ -82,9 +29,27 @@ import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLFilter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
+import static java.nio.file.Files.exists;
+import static java.util.stream.Collectors.toMap;
+import static org.dita.dost.util.Configuration.configuration;
+import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.Job.KEYDEF_LIST_FILE;
+import static org.dita.dost.util.URLUtils.*;
+import static org.dita.dost.util.XMLUtils.close;
+import static org.dita.dost.util.XMLUtils.getChildElements;
 
 /**
  * Keyref ModuleElem.
@@ -469,7 +434,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
         try {
             logger.debug("Using " + (r.scope.name != null ? r.scope.name + " scope" : "root scope"));
             if (r.out != null) {
-                logger.info("Processing " + job.tempDirURI.resolve(r.in.uri) +
+                logger.debug("Processing " + job.tempDirURI.resolve(r.in.uri) +
                         " to " + job.tempDirURI.resolve(r.out.uri));
                 xmlUtils.transform(new File(job.tempDir, r.in.file.getPath()),
                                    new File(job.tempDir, r.out.file.getPath()),
