@@ -38,14 +38,32 @@ final class FilterModule extends AbstractPipelineModuleImpl {
         if (logger == null) {
             throw new IllegalStateException("Logger not set");
         }
+
+        FilterUtils filterUtils = newFilterUtils(input);
+        Map<URI, Set<URI>> dictionary = readSubjectDictionary();
+
+        job.getFileInfo(fileInfoFilter).stream().parallel().forEach(fileInfo -> {
+            final ProfilingFilter writer = newProfilingFilter(filterUtils);
+            final SubjectSchemeReader subjectSchemeReader = new SubjectSchemeReader(logger);
+            final File file = new File(job.tempDir, fileInfo.file.getPath());
+            logger.debug("Processing " + file.getAbsolutePath());
+            loadSubjectSchemes(dictionary, fileInfo, subjectSchemeReader);
+            filterFile(filterUtils, fileInfo, writer, subjectSchemeReader, file);
+        });
+
+        updateJobFile();
+        return null;
+    }
+
+    private FilterUtils newFilterUtils(AbstractPipelineInput input) {
         final String transtype = input.getAttribute(ANT_INVOKER_EXT_PARAM_TRANSTYPE);
         final File ditavalFile = Optional.of(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL))
                 .filter(File::exists)
                 .orElse(null);
-
         final DitaValReader ditaValReader = new DitaValReader();
         ditaValReader.setLogger(logger);
         ditaValReader.setJob(job);
+
         final FilterUtils filterUtils;
         if (ditavalFile != null) {
             ditaValReader.read(ditavalFile.toURI());
@@ -55,59 +73,61 @@ final class FilterModule extends AbstractPipelineModuleImpl {
             filterUtils = new FilterUtils(printTranstype.contains(transtype));
         }
         filterUtils.setLogger(logger);
+        return filterUtils;
+    }
 
-        final ProfilingFilter writer = new ProfilingFilter();
-        writer.setLogger(logger);
-        writer.setJob(job);
-        writer.setFilterUtils(filterUtils);
-
-        final SubjectSchemeReader subjectSchemeReader = new SubjectSchemeReader();
-        subjectSchemeReader.setLogger(logger);
+    private Map<URI, Set<URI>> readSubjectDictionary() throws DITAOTException {
         Map<URI, Set<URI>> dic;
         try {
             dic = SubjectSchemeReader.readMapFromXML(new File(job.tempDir, FILE_NAME_SUBJECT_DICTIONARY));
         } catch (final IOException e) {
             throw new DITAOTException(e);
         }
+        return dic;
+    }
 
-        for (final FileInfo f: job.getFileInfo(fileInfoFilter)) {
-            final File file = new File(job.tempDir, f.file.getPath());
-            logger.debug("Processing " + file.getAbsolutePath());
+    private ProfilingFilter newProfilingFilter(FilterUtils filterUtils) {
+        final ProfilingFilter writer = new ProfilingFilter();
+        writer.setLogger(logger);
+        writer.setJob(job);
+        writer.setFilterUtils(filterUtils);
+        return writer;
+    }
 
-            subjectSchemeReader.reset();
-            final Set<URI> schemaSet = dic.get(f.uri);
-            if (schemaSet != null && !schemaSet.isEmpty()) {
-                logger.info("Loading subject schemes");
-                for (final URI schema : schemaSet) {
-                    final File scheme = new File(job.tempDirURI.resolve(schema.getPath() + SUBJECT_SCHEME_EXTENSION));
-                    if (scheme.exists()) {
-                        subjectSchemeReader.loadSubjectScheme(scheme);
-                    }
+    private void loadSubjectSchemes(Map<URI, Set<URI>> dic, FileInfo f, SubjectSchemeReader subjectSchemeReader) {
+        final Set<URI> schemaSet = dic.get(f.uri);
+        if (schemaSet != null && !schemaSet.isEmpty()) {
+            logger.info("Loading subject schemes");
+            for (final URI schema : schemaSet) {
+                final File scheme = new File(job.tempDirURI.resolve(schema.getPath() + SUBJECT_SCHEME_EXTENSION));
+                if (scheme.exists()) {
+                    subjectSchemeReader.loadSubjectScheme(scheme);
                 }
-            }
-
-            writer.setFilterUtils(filterUtils.refine(subjectSchemeReader.getSubjectSchemeMap()));
-            writer.setCurrentFile(file.toURI());
-
-            try {
-                writer.write(file.getAbsoluteFile());
-                if (!writer.hasElementOutput()) {
-                    logger.info("All content in " + file.getAbsolutePath() + " was filtered out");
-                    job.remove(f);
-                    FileUtils.delete(file);
-                }
-            } catch (final Exception e) {
-                logger.error("Failed to profile " + file.getAbsolutePath() + ": " + e.getMessage());
             }
         }
+    }
 
+    private void filterFile(FilterUtils filterUtils, FileInfo f, ProfilingFilter writer, SubjectSchemeReader subjectSchemeReader, File file) {
+        writer.setFilterUtils(filterUtils.refine(subjectSchemeReader.getSubjectSchemeMap()));
+        writer.setCurrentFile(file.toURI());
+        try {
+            writer.write(file.getAbsoluteFile());
+            if (!writer.hasElementOutput()) {
+                logger.info("All content in " + file.getAbsolutePath() + " was filtered out");
+                job.remove(f);
+                FileUtils.delete(file);
+            }
+        } catch (final Exception e) {
+            logger.error("Failed to profile " + file.getAbsolutePath() + ": " + e.getMessage());
+        }
+    }
+
+    private void updateJobFile() throws DITAOTException {
         try {
             job.write();
         } catch (final IOException e) {
             throw new DITAOTException(e);
         }
-
-        return null;
     }
 
 }
