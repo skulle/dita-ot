@@ -61,7 +61,7 @@ public class TopicBranchFilter {
             TopicBranch current = elements.pop();
             Element element = current.element;
 
-            List<FilterUtils> filterUtils = combineFilterUtils(element, filter, subjectSchemeMap);
+            List<FilterUtils> filterUtils = combineFilterUtils(element, current.filter, subjectSchemeMap);
             URI srcAbsUri = job.tempDirURI.resolve(map.resolve(element.getAttribute(ATTRIBUTE_NAME_HREF)));
             if (shouldFilter(element, filterUtils, srcAbsUri)) {
                 ProfilingFilter writer = newProfilingFilter(filterUtils, srcAbsUri);
