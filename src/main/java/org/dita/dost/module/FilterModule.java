@@ -7,17 +7,6 @@
  */
 package org.dita.dost.module;
 
-import static org.dita.dost.util.Configuration.printTranstype;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.FilterUtils.*;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
 import org.apache.tools.ant.util.FileUtils;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.pipeline.AbstractPipelineInput;
@@ -27,6 +16,17 @@ import org.dita.dost.reader.SubjectSchemeReader;
 import org.dita.dost.util.FilterUtils;
 import org.dita.dost.util.Job.FileInfo;
 import org.dita.dost.writer.ProfilingFilter;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.dita.dost.util.Configuration.printTranstype;
+import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.FilterUtils.SUBJECT_SCHEME_EXTENSION;
 
 /**
  * Filter module class.
@@ -72,7 +72,7 @@ final class FilterModule extends AbstractPipelineModuleImpl {
 
         for (final FileInfo f: job.getFileInfo(fileInfoFilter)) {
             final File file = new File(job.tempDir, f.file.getPath());
-            logger.info("Processing " + file.getAbsolutePath());
+            logger.debug("Processing " + file.getAbsolutePath());
 
             subjectSchemeReader.reset();
             final Set<URI> schemaSet = dic.get(f.uri);
