@@ -92,7 +92,7 @@ final class MaprefModule extends AbstractPipelineModuleImpl {
         final File inputFile = new File(job.tempDir, input.file.getPath());
         final File outputFile = new File(inputFile.getAbsolutePath() + FILE_EXTENSION_TEMP);
 
-        logger.info("Processing " + inputFile.toURI());
+        logger.debug("Processing " + inputFile.toURI());
         Document doc;
         try (InputStream in = new BufferedInputStream(new FileInputStream(inputFile))) {
             doc = XMLUtils.getDocumentBuilder().newDocument();
