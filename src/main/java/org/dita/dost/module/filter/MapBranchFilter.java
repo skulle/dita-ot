@@ -68,7 +68,7 @@ public class MapBranchFilter {
 
     private List<FilterUtils> getBaseFilter(final SubjectScheme subjectSchemeMap) {
         URI ditavalFile = Optional.of(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL)).filter(File::exists).map(File::toURI).orElse(null);
-        if (ditavalFile != null && !subjectSchemeMap.isEmpty()) {
+        if (ditavalFile != null) {
             final FilterUtils f = newFilterUtils(ditavalFile, logger).refine(subjectSchemeMap);
             return singletonList(f);
         }
