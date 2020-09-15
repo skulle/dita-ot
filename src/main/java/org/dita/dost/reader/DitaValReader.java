@@ -219,6 +219,7 @@ public final class DitaValReader implements AbstractReader {
                 }
                 if (attName != null && attName.equals(REV)
                         && !filterAttributes.isEmpty() && !filterAttributes.contains(REV)) {
+                    logger.warn(MessageUtils.getMessage("DOTJ074W").toString());
                     return;
                 }
             }

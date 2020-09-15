@@ -150,6 +150,7 @@ public class FilterUtils {
     public static FilterUtils newFilterUtils(URI ditaval, DITAOTLogger logger) {
         logger.info("Reading " + ditaval);
         DitaValReader ditaValReader = new DitaValReader();
+        ditaValReader.setLogger(logger);
         ditaValReader.read(ditaval);
         Map<FilterUtils.FilterKey, FilterUtils.Action> filterMap = ditaValReader.getFilterMap();
         FilterUtils f = new FilterUtils(filterMap, ditaValReader.getForegroundConflictColor(), ditaValReader.getBackgroundConflictColor());
