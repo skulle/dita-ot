@@ -22,7 +22,6 @@ import org.xml.sax.*;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
-import javax.xml.stream.XMLStreamException;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
@@ -30,7 +29,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.sax.SAXSource;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -331,7 +329,7 @@ public class FilterUtils {
 
     private boolean excludeReferencedTopic(Element element, QName[][] properties, Attributes attributes) {
         String href = element.getAttribute(ATTRIBUTE_NAME_HREF);
-        if (isMapTopicRef(attributes) && notEmpty(href)) {
+        if (isValidMapTopicRef(attributes) && notEmpty(href)) {
             Optional<Attributes> referencedAttributes = loadReferencedAttributes(href);
             if (!referencedAttributes.isPresent()) {
                 return false;
@@ -353,7 +351,7 @@ public class FilterUtils {
             inputStream = new BOMInputStream(new FileInputStream(xmlFile.toFile()), false);
             eventReader = xmlStreams.initializeReader(inputStream);
             return Optional.of(xmlStreams.collectRootAttributes(eventReader));
-        } catch (NullPointerException | URISyntaxException | FileNotFoundException | XMLStreamException e) {
+        } catch (Exception e) {
             logger.warn(format("Source document could not be loaded for %s. Cannot validate filtering attributes. Error message: %s", href, e.getMessage()));
             return Optional.empty();
         } finally {
@@ -373,8 +371,11 @@ public class FilterUtils {
         return builder.build();
     }
 
-    private boolean isMapTopicRef(Attributes attributes) {
-        return !DITAVAREF_D_DITAVALREF.matches(attributes) && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes));
+    private boolean isValidMapTopicRef(Attributes attributes) {
+        return !DITAVAREF_D_DITAVALREF.matches(attributes)
+                && (MAP_MAP.matches(attributes) || MAP_TOPICREF.matches(attributes))
+                && !"image".equalsIgnoreCase(attributes.getValue(ATTRIBUTE_NAME_FORMAT))
+                && !"external".equalsIgnoreCase(attributes.getValue(ATTRIBUTE_NAME_SCOPE));
     }
 
     private boolean isNotKeydef(Attributes attributes) {
