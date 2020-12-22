@@ -12,7 +12,7 @@ import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.MessageUtils;
 import org.dita.dost.module.ChunkModule.ChunkFilenameGenerator;
 import org.dita.dost.module.ChunkModule.ChunkFilenameGeneratorFactory;
-import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
+import org.dita.dost.module.reader.TempFileNameScheme;
 import org.dita.dost.util.DitaClass;
 import org.dita.dost.util.Job;
 import org.dita.dost.util.Job.FileInfo;
@@ -25,14 +25,7 @@ import org.xml.sax.SAXException;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
-import javax.xml.transform.Result;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -208,7 +201,7 @@ public final class ChunkMapReader extends AbstractDomFilter {
         // create the reference to the new file on root element.
         String newFilename = replaceExtension(new File(currentFile).getName(), FILE_EXTENSION_DITA);
         URI newFile = currentFile.resolve(newFilename);
-        if (new File(newFile).exists()) {
+        if (job.getStore().exists(newFile)) {
             final URI oldFile = newFile;
             newFilename = chunkFilenameGenerator.generateFilename(CHUNK_PREFIX, FILE_EXTENSION_DITA);
             newFile = currentFile.resolve(newFilename);
@@ -238,7 +231,7 @@ public final class ChunkMapReader extends AbstractDomFilter {
      * Create the new topic stump.
      */
     private void createTopicStump(final URI newFile) {
-        try (final OutputStream newFileWriter = new FileOutputStream(new File(newFile))) {
+        try (final OutputStream newFileWriter = job.getStore().getOutputStream(newFile)) {
             final XMLStreamWriter o = XMLOutputFactory.newInstance().createXMLStreamWriter(newFileWriter, UTF8);
             o.writeStartDocument();
             o.writeProcessingInstruction(PI_WORKDIR_TARGET, UNIX_SEPARATOR + new File(newFile.resolve(".")).getAbsolutePath());
@@ -286,23 +279,10 @@ public final class ChunkMapReader extends AbstractDomFilter {
     }
 
     private void outputMapFile(final URI file, final Document doc) {
-        Result result = null;
         try {
-            final Transformer t = TransformerFactory.newInstance().newTransformer();
-            result = new StreamResult(new FileOutputStream(new File(file)));
-            t.transform(new DOMSource(doc), result);
-        } catch (final RuntimeException e) {
-            throw e;
-        } catch (final TransformerException e) {
-            logger.error(e.getMessageAndLocation(), e);
-        } catch (final Exception e) {
-            logger.error(e.getMessage(), e);
-        } finally {
-            try {
-                close(result);
-            } catch (final IOException e) {
-                logger.error(e.getMessage(), e);
-            }
+            job.getStore().writeDocument(doc, file);
+        } catch (final IOException e) {
+            logger.error("Failed to serialize map: " + e.getMessage(), e);
         }
     }
 
@@ -341,7 +321,7 @@ public final class ChunkMapReader extends AbstractDomFilter {
         final String chunkByToken = getChunkByToken(chunk, "by-", defaultChunkByToken);
 
         if (ATTR_SCOPE_VALUE_EXTERNAL.equals(scope)
-                || (href != null && !toFile(currentFile.resolve(href.toString())).exists())
+                || (href != null && !job.getStore().exists(currentFile.resolve(href.toString())))
                 || (chunk.isEmpty() && href == null)) {
             processChildTopicref(topicref);
         } else if (chunk.contains(CHUNK_TO_CONTENT)) {
@@ -425,7 +405,10 @@ public final class ChunkMapReader extends AbstractDomFilter {
         if (navtitle == null) {
             navtitle = getValue(topicref, ATTRIBUTE_NAME_NAVTITLE);
         }
-        final String shortDesc = getChildElementValueOfTopicmeta(topicref, MAP_SHORTDESC);
+        String shortDesc = getChildElementValueOfTopicmeta(topicref, TOPIC_SHORTDESC);
+        if (shortDesc == null) {
+            shortDesc = getChildElementValueOfTopicmeta(topicref, MAP_SHORTDESC);
+        }
 
         writeChunk(absTemp, name, navtitle, shortDesc);
 
@@ -446,7 +429,7 @@ public final class ChunkMapReader extends AbstractDomFilter {
     }
 
     private void writeChunk(final URI outputFileName, String id, String title, String shortDesc) {
-        try (final OutputStream output = new FileOutputStream(new File(outputFileName))) {
+        try (final OutputStream output = job.getStore().getOutputStream(outputFileName)) {
             final XMLSerializer serializer = XMLSerializer.newInstance(output);
             serializer.writeStartDocument();
             if (title == null && shortDesc == null) {
@@ -460,6 +443,7 @@ public final class ChunkMapReader extends AbstractDomFilter {
                 serializer.writeAttribute(ATTRIBUTE_NAME_ID, id);
                 serializer.writeAttribute(ATTRIBUTE_NAME_CLASS, TOPIC_TOPIC.toString());
                 serializer.writeAttribute(ATTRIBUTE_NAME_DOMAINS, "");
+                serializer.writeAttribute(ATTRIBUTE_NAME_SPECIALIZATIONS, "");
                 serializer.writeStartElement(TOPIC_TITLE.localName);
                 serializer.writeAttribute(ATTRIBUTE_NAME_CLASS, TOPIC_TITLE.toString());
                 if (title != null) {

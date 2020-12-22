@@ -8,34 +8,9 @@
  */
 package org.dita.dost.module;
 
-import static org.dita.dost.reader.GenListModuleReader.*;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.FileUtils.getRelativePath;
-import static org.dita.dost.util.FileUtils.resolve;
-import static org.dita.dost.util.Job.*;
-import static org.dita.dost.util.Configuration.*;
-import static org.dita.dost.util.URLUtils.*;
-import static org.dita.dost.util.FilterUtils.*;
-import static org.dita.dost.util.XMLUtils.*;
-
-import java.io.*;
-import java.net.URI;
-import java.util.*;
-
-import javax.xml.namespace.QName;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.transform.Result;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.sax.SAXTransformerFactory;
-import javax.xml.transform.sax.TransformerHandler;
-import javax.xml.transform.stream.StreamResult;
-
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.exception.DITAOTXMLErrorHandler;
-import org.dita.dost.module.GenMapAndTopicListModule.*;
+import org.dita.dost.module.reader.TempFileNameScheme;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.DitaValReader;
@@ -48,6 +23,27 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.*;
 import org.xml.sax.ext.LexicalHandler;
+
+import javax.xml.namespace.QName;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.dita.dost.reader.GenListModuleReader.ROOT_URI;
+import static org.dita.dost.reader.GenListModuleReader.isFormatDita;
+import static org.dita.dost.util.Configuration.Mode;
+import static org.dita.dost.util.Configuration.printTranstype;
+import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.FileUtils.getRelativePath;
+import static org.dita.dost.util.FileUtils.resolve;
+import static org.dita.dost.util.FilterUtils.SUBJECT_SCHEME_EXTENSION;
+import static org.dita.dost.util.Job.FileInfo;
+import static org.dita.dost.util.URLUtils.exists;
+import static org.dita.dost.util.URLUtils.toFile;
+import static org.dita.dost.util.XMLUtils.close;
 
 
 /**
@@ -74,6 +70,7 @@ public final class DebugAndFilterModule extends SourceReaderModule {
     private Map<QName, Map<String, String>> defaultValueMap;
     /** Absolute path to current source file. */
     private URI currentFile;
+    private List<URI> resources;
     private Map<URI, Set<URI>> dic;
     private SubjectSchemeReader subjectSchemeReader;
     private FilterUtils baseFilterUtils;
@@ -123,11 +120,6 @@ public final class DebugAndFilterModule extends SourceReaderModule {
             return;
         }
         outputFile = new File(job.tempDir, f.file.getPath());
-        final File outputDir = outputFile.getParentFile();
-        if (!outputDir.exists() && !outputDir.mkdirs()) {
-            logger.error("Failed to create output directory " + outputDir.getAbsolutePath());
-            return;
-        }
         logger.info("Processing " + f.src + " to " + outputFile.toURI());
 
         final Set<URI> schemaSet = dic.get(f.uri);
@@ -148,13 +140,8 @@ public final class DebugAndFilterModule extends SourceReaderModule {
         }
 
         InputSource in = null;
-        Result out = null;
         try {
             reader.setErrorHandler(new DITAOTXMLErrorHandler(currentFile.toString(), logger));
-
-            final TransformerFactory tf = TransformerFactory.newInstance();
-            final SAXTransformerFactory stf = (SAXTransformerFactory) tf;
-            final TransformerHandler serializer = stf.newTransformerHandler();
 
             XMLReader parser = getXmlReader(f.format);
             XMLReader xmlSource = parser;
@@ -173,20 +160,16 @@ public final class DebugAndFilterModule extends SourceReaderModule {
             } catch (final SAXNotRecognizedException e) {}
 
             in = new InputSource(f.src.toString());
-            out = new StreamResult(new FileOutputStream(outputFile));
-            serializer.setResult(out);
-            xmlSource.setContentHandler(serializer);
-            xmlSource.parse(new InputSource(f.src.toString()));
+
+            final ContentHandler result = job.getStore().getContentHandler(outputFile.toURI());
+
+            xmlSource.setContentHandler(result);
+            xmlSource.parse(in);
         } catch (final RuntimeException e) {
             throw e;
         } catch (final Exception e) {
             logger.error(e.getMessage(), e) ;
         } finally {
-            try {
-                close(out);
-            } catch (final Exception e) {
-                logger.error(e.getMessage(), e) ;
-            }
             try {
                 close(in);
             } catch (final IOException e) {
@@ -200,18 +183,20 @@ public final class DebugAndFilterModule extends SourceReaderModule {
     }
 
     private void init() throws IOException, DITAOTException, SAXException {
+        initXmlReader();
+
         // Output subject schemas
-        outputSubjectScheme();
         subjectSchemeReader = new SubjectSchemeReader();
         subjectSchemeReader.setLogger(logger);
         subjectSchemeReader.setJob(job);
-        dic = SubjectSchemeReader.readMapFromXML(new File(job.tempDir, FILE_NAME_SUBJECT_DICTIONARY));
+        outputSubjectScheme();
+        dic = subjectSchemeReader.readMapFromXML(new File(job.tempDir, FILE_NAME_SUBJECT_DICTIONARY));
 
         if (profilingEnabled) {
             final DitaValReader filterReader = new DitaValReader();
             filterReader.setLogger(logger);
             filterReader.setJob(job);
-            if (ditavalFile != null && ditavalFile.exists()) {
+            if (job.getStore().exists(ditavalFile.toURI())) {
                 filterReader.read(ditavalFile.getAbsoluteFile());
                 baseFilterUtils = new FilterUtils(printTranstype.contains(transtype), filterReader.getFilterMap(),
                         filterReader.getForegroundConflictColor(), filterReader.getBackgroundConflictColor());
@@ -220,8 +205,6 @@ public final class DebugAndFilterModule extends SourceReaderModule {
             }
             baseFilterUtils.setLogger(logger);
         }
-
-        initXmlReader();
 
         initFilters();
     }
@@ -255,6 +238,14 @@ public final class DebugAndFilterModule extends SourceReaderModule {
             debugFilter.setCurrentFile(currentFile);
             pipe.add(debugFilter);
         }
+
+//        if (currentFile.equals(rootFile)) {
+//            final ResourceInsertFilter filter = new ResourceInsertFilter();
+//            filter.setLogger(logger);
+//            filter.setResources(resources);
+//            filter.setCurrentFile(currentFile);
+//            pipe.add(filter);
+//        }
 
         if (filterUtils != null) {
             final ProfilingFilter profilingFilter = new ProfilingFilter();
@@ -292,8 +283,6 @@ public final class DebugAndFilterModule extends SourceReaderModule {
     }
 
     private void readArguments(AbstractPipelineInput input) {
-        final File baseDir = toFile(input.getAttribute(ANT_INVOKER_PARAM_BASEDIR));
-        ditaDir = new File(input.getAttribute(ANT_INVOKER_EXT_PARAM_DITADIR));
         transtype = input.getAttribute(ANT_INVOKER_EXT_PARAM_TRANSTYPE);
         profilingEnabled = true;
         if (input.getAttribute(ANT_INVOKER_PARAM_PROFILING_ENABLED) != null) {
@@ -308,6 +297,14 @@ public final class DebugAndFilterModule extends SourceReaderModule {
         genDebugInfo = Boolean.valueOf(input.getAttribute(ANT_INVOKER_EXT_PARAM_GENERATE_DEBUG_ATTR));
         final String mode = input.getAttribute(ANT_INVOKER_EXT_PARAM_PROCESSING_MODE);
         processingMode = mode != null ? Mode.valueOf(mode.toUpperCase()) : Mode.LAX;
+
+        if (input.getAttribute(ANT_INVOKER_PARAM_RESOURCES) != null) {
+            resources = Stream.of(input.getAttribute(ANT_INVOKER_PARAM_RESOURCES).split(File.pathSeparator))
+                    .map(resource -> new File(resource).toURI())
+                    .collect(Collectors.toList());
+        } else {
+            resources = Collections.emptyList();
+        }
     }
 
 
@@ -318,13 +315,10 @@ public final class DebugAndFilterModule extends SourceReaderModule {
      */
     private void outputSubjectScheme() throws DITAOTException {
         try {
-            final Map<URI, Set<URI>> graph = SubjectSchemeReader.readMapFromXML(new File(job.tempDir, FILE_NAME_SUBJECT_RELATION));
+            final Map<URI, Set<URI>> graph = subjectSchemeReader.readMapFromXML(new File(job.tempDir, FILE_NAME_SUBJECT_RELATION));
 
             final Queue<URI> queue = new LinkedList<>(graph.keySet());
             final Set<URI> visitedSet = new HashSet<>();
-
-            final DocumentBuilder builder = XMLUtils.getDocumentBuilder();
-            builder.setEntityResolver(CatalogUtils.getCatalogResolver());
 
             while (!queue.isEmpty()) {
                 final URI parent = queue.poll();
@@ -341,13 +335,13 @@ public final class DebugAndFilterModule extends SourceReaderModule {
                 final Document parentRoot;
                 if (!tmprel.exists()) {
                     final URI src = job.getFileInfo(parent).src;
-                    parentRoot = builder.parse(src.toString());
+                    parentRoot = job.getStore().getDocument(src);
                 } else {
-                    parentRoot = builder.parse(tmprel);
+                    parentRoot = job.getStore().getDocument(tmprel.toURI());
                 }
                 if (children != null) {
                     for (final URI childpath: children) {
-                        final Document childRoot = builder.parse(job.getInputFile().resolve(childpath.getPath()).toString());
+                        final Document childRoot = job.getStore().getImmutableDocument(job.getInputFile().resolve(childpath.getPath()));
                         mergeScheme(parentRoot, childRoot);
                         generateScheme(new File(job.tempDir, childpath.getPath() + SUBJECT_SCHEME_EXTENSION), childRoot);
                     }
@@ -476,31 +470,11 @@ public final class DebugAndFilterModule extends SourceReaderModule {
      * @throws DITAOTException if generation fails
      */
     private void generateScheme(final File filename, final Document root) throws DITAOTException {
-        final File p = filename.getParentFile();
-        if (!p.exists() && !p.mkdirs()) {
-            throw new DITAOTException("Failed to make directory " + p.getAbsolutePath());
-        }
-        Result res = null;
         try {
-            res = new StreamResult(new FileOutputStream(filename));
-            final DOMSource ds = new DOMSource(root);
-            final TransformerFactory tff = TransformerFactory.newInstance();
-            final Transformer tf = tff.newTransformer();
-            tf.transform(ds, res);
-        } catch (final RuntimeException e) {
-            throw e;
-        } catch (final TransformerException e) {
-            logger.error(e.getMessageAndLocation(), e) ;
-            throw new DITAOTException(e);
-        } catch (final Exception e) {
+            job.getStore().writeDocument(root, filename.toURI());
+        } catch (final IOException e) {
             logger.error(e.getMessage(), e) ;
             throw new DITAOTException(e);
-        } finally {
-            try {
-                close(res);
-            } catch (IOException e) {
-                throw new DITAOTException(e);
-            }
         }
     }
 

@@ -20,6 +20,7 @@ import org.apache.tools.ant.types.ResourceCollection;
 import org.apache.tools.ant.types.resources.FileResource;
 import org.apache.tools.ant.types.resources.URLResource;
 import org.dita.dost.ant.ExtensibleAntInvoker;
+import org.dita.dost.store.ant.types.StoreResource;
 import org.dita.dost.util.Constants;
 import org.dita.dost.util.FileUtils;
 import org.dita.dost.util.Job;
@@ -58,10 +59,10 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
             for (final FileInfo f : job.getFileInfo(this::filter)) {
                 log("Scanning for " + f.file.getPath(), Project.MSG_VERBOSE);
                 final File tempFile = new File(job.tempDir, f.file.getPath());
-                if (tempFile.exists()) {
+                if (job.getStore().exists(tempFile.toURI())) {
                     log("Found temporary directory file " + tempFile, Project.MSG_VERBOSE);
-                    res.add(new FileResource(job.tempDir, f.file.toString()));
-                } else if (f.src.getScheme().equals("file")) {
+                    res.add(new StoreResource(job, job.tempDirURI.relativize(f.uri)));
+                } else if (f.src != null && Objects.equals(f.src.getScheme(), "file")) {
                     final File srcFile = new File(f.src);
                     if (srcFile.exists()) {
                         log("Found source directory file " + srcFile, Project.MSG_VERBOSE);
@@ -70,10 +71,10 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
                     } else {
                         log("File " + f.src + " not found", Project.MSG_ERR);
                     }
-                } else if (f.src.getScheme().equals("data")) {
+                } else if (f.src != null && Objects.equals(f.src.getScheme(), "data")) {
                     log("Ignore data URI", Project.MSG_VERBOSE);
                 } else {
-                    log("Found source URI " + f.src.toString(), Project.MSG_VERBOSE);
+                    log("Found source URI " + f.src, Project.MSG_VERBOSE);
                     try {
                         final JobResource r = new JobResource(job.getInputDir().toURL(), f.uri.toString());
                         res.add(r);
@@ -89,14 +90,7 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
 
     @VisibleForTesting
     Job getJob() {
-        String tempDir = getProject().getUserProperty(ANT_TEMP_DIR);
-        if (tempDir == null) {
-            tempDir = getProject().getProperty(ANT_TEMP_DIR);
-        }
-        if (tempDir == null) {
-            throw new IllegalStateException();
-        }
-        final Job job = ExtensibleAntInvoker.getJob(new File(tempDir), getProject());
+        final Job job = ExtensibleAntInvoker.getJob(getProject());
         if (job == null) {
             throw new IllegalStateException();
         }
@@ -129,6 +123,10 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
 
     public void setInput(final boolean isInput) {
         include.setInput(isInput);
+    }
+
+    public void setInputResource(final boolean isInputResource) {
+        include.setInputResource(isInputResource);
     }
 
     public void setProcessingRole(final String processingRole) {
@@ -167,6 +165,7 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
         return (incl.formats.isEmpty() || (incl.formats.contains(format))) &&
                 (incl.hasConref == null || f.hasConref == incl.hasConref) &&
                 (incl.isInput == null || f.isInput == incl.isInput) &&
+                (incl.isInputResource == null || f.isInputResource == incl.isInputResource) &&
                 (incl.isResourceOnly == null || f.isResourceOnly == incl.isResourceOnly);
     }
 
@@ -196,15 +195,18 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
         private Set<String> formats = Collections.emptySet();
         private Boolean hasConref;
         private Boolean isInput;
+        private Boolean isInputResource;
         private Boolean isResourceOnly;
 
         public SelectorElem() {
         }
 
-        public SelectorElem(Set<String> formats, Boolean hasConref, Boolean isInput, Boolean isResourceOnly) {
+        public SelectorElem(Set<String> formats, Boolean hasConref, Boolean isInput,
+                            Boolean isInputResource, Boolean isResourceOnly) {
             this.formats = formats != null ? formats : Collections.emptySet();
             this.hasConref = hasConref;
             this.isInput = isInput;
+            this.isInputResource = isInputResource;
             this.isResourceOnly = isResourceOnly;
         }
 
@@ -224,12 +226,20 @@ public class JobSourceSet extends AbstractFileSet implements ResourceCollection 
             this.isInput = isInput;
         }
 
+        public void setInputResource(final boolean isInputResource) {
+            this.isInputResource = isInputResource;
+        }
+
         public void setProcessingRole(final String processingRole) {
             this.isResourceOnly = processingRole.equals(Constants.ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY);
         }
 
         public boolean isEmpty() {
-            return formats.isEmpty() && hasConref == null && isInput == null && isResourceOnly == null;
+            return formats.isEmpty() &&
+                    hasConref == null &&
+                    isInput == null &&
+                    isInputResource == null &&
+                    isResourceOnly == null;
         }
     }
 }

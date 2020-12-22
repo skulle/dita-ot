@@ -10,14 +10,11 @@ package org.dita.dost.module.filter;
 
 import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.module.AbstractPipelineModuleImpl;
-import org.dita.dost.module.GenMapAndTopicListModule;
+import org.dita.dost.module.reader.TempFileNameScheme;
 import org.dita.dost.reader.DitaValReader;
 import org.dita.dost.reader.SubjectSchemeReader;
-import org.dita.dost.util.Constants;
-import org.dita.dost.util.FilterUtils;
-import org.dita.dost.util.Job;
+import org.dita.dost.util.*;
 import org.dita.dost.util.Job.FileInfo;
-import org.dita.dost.util.StringUtils;
 import org.w3c.dom.Element;
 
 import java.io.*;
@@ -37,7 +34,7 @@ import static org.dita.dost.util.XMLUtils.*;
 public abstract class AbstractBranchFilterModule extends AbstractPipelineModuleImpl {
 
     private final DitaValReader ditaValReader;
-    GenMapAndTopicListModule.TempFileNameScheme tempFileNameScheme;
+    TempFileNameScheme tempFileNameScheme;
     final SubjectSchemeReader subjectSchemeReader;
     private final Map<URI, FilterUtils> filterCache = new HashMap<>();
     /** Absolute URI to map being processed. */
@@ -55,7 +52,7 @@ public abstract class AbstractBranchFilterModule extends AbstractPipelineModuleI
             final String cls = Optional
                     .ofNullable(job.getProperty("temp-file-name-scheme"))
                     .orElse(configuration.get("temp-file-name-scheme"));
-            tempFileNameScheme = (GenMapAndTopicListModule.TempFileNameScheme) Class.forName(cls).newInstance();
+            tempFileNameScheme = (TempFileNameScheme) Class.forName(cls).newInstance();
         } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -155,10 +152,10 @@ public abstract class AbstractBranchFilterModule extends AbstractPipelineModuleI
         }
 
         // write list attribute to file
-        final String fileKey = Constants.REL_FLAGIMAGE_LIST.substring(0, Constants.REL_FLAGIMAGE_LIST.lastIndexOf("list")) + "file";
-        prop.setProperty(fileKey, Constants.REL_FLAGIMAGE_LIST.substring(0, Constants.REL_FLAGIMAGE_LIST.lastIndexOf("list")) + ".list");
+        final String fileKey = REL_FLAGIMAGE_LIST.substring(0, REL_FLAGIMAGE_LIST.lastIndexOf("list")) + "file";
+        prop.setProperty(fileKey, REL_FLAGIMAGE_LIST.substring(0, REL_FLAGIMAGE_LIST.lastIndexOf("list")) + ".list");
         final File list = new File(job.tempDir, prop.getProperty(fileKey));
-        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(list, true)))) {
+        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(job.getStore().getOutputStream(list.toURI())))) {
             for (URI aNewSet : newSet) {
                 bufferedWriter.write(aNewSet.getPath());
                 bufferedWriter.write('\n');
@@ -168,7 +165,7 @@ public abstract class AbstractBranchFilterModule extends AbstractPipelineModuleI
             logger.error(e.getMessage(), e) ;
         }
 
-        prop.setProperty(Constants.REL_FLAGIMAGE_LIST, StringUtils.join(newSet, COMMA));
+        prop.setProperty(REL_FLAGIMAGE_LIST, StringUtils.join(newSet, COMMA));
     }
 
     private FileInfo getOrCreateFileInfo(final URI file) {

@@ -9,7 +9,9 @@ package org.dita.dost.module;
 
 import org.dita.dost.TestUtils;
 import org.dita.dost.TestUtils.CachingLogger;
+import org.dita.dost.store.StreamStore;
 import org.dita.dost.util.Job;
+import org.dita.dost.util.XMLUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,7 +43,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
     }
 
     private Job getJob() throws IOException {
-        final Job job = new Job(tempDir);
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(tempDir.toURI());
         job.add(new Job.FileInfo.Builder()
                 .src(new File(tempDir, "input.ditamap").toURI())
@@ -57,7 +59,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
                     .format(ATTR_FORMAT_VALUE_DITAVAL)
                     .build());
         }
-        for (final String uri: Arrays.asList("install.dita", "perform-install.dita", "configure.dita")) {
+        for (final String uri: Arrays.asList("install.dita", "perform-install.dita", "configure.dita", "exclude.dita")) {
             job.add(new Job.FileInfo.Builder()
                     .src(new File(tempDir, uri).toURI())
                     .result(new File(tempDir, uri).toURI())
@@ -75,7 +77,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
     }
     
     private Job getUplevelsJob(File uplevelsTempDir) throws IOException {
-        final Job job = new Job(uplevelsTempDir);
+        final Job job = new Job(uplevelsTempDir, new StreamStore(uplevelsTempDir, new XMLUtils()));
         job.setInputDir(uplevelsTempDir.toURI());
         job.add(new Job.FileInfo.Builder()
                 .src(new File(uplevelsTempDir, "main/testuplevels.ditamap").toURI())
@@ -136,6 +138,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
         m.setJob(job);
         final CachingLogger logger = new CachingLogger();
         m.setLogger(logger);
+        m.setXmlUtils(new XMLUtils());
         
         m.processMap(URI.create("input.ditamap"));
         assertXMLEqual(new InputSource(new File(expDir, "input.ditamap").toURI().toString()),
@@ -144,7 +147,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
         final List<String> exp = Arrays.asList(
                 "installation-procedure.dita", "getting-started.dita",
                 //"http://example.com/install.dita",
-                "configure.dita",
+                //"configure.dita",
                 "input.ditamap", "install.dita", "linux.ditaval", "perform-install.dita",
                 "configure-novice.dita", "novice.ditaval", "configure-admin.dita",
                 "advanced.ditaval", "install-mac.dita", "mac.ditaval",
@@ -165,7 +168,8 @@ public class BranchFilterModuleTest extends BranchFilterModule {
                 "configure-admin.dita", "install-mac.dita", "perform-install-mac.dita",
                 "installation-procedure-mac.dita", "configure-novice-mac.dita", "configure-admin-mac.dita",
                 "install-win.dita", "perform-install-win.dita", "installation-procedure-win.dita",
-                "configure-novice-win.dita", "configure-admin-win.dita", "install-linux.dita", "install.dita"
+                "configure-novice-win.dita", "configure-admin-win.dita", "install-linux.dita", "install.dita",
+                "exclude.dita"
 
         );
         Collections.sort(filesExp);
@@ -186,6 +190,7 @@ public class BranchFilterModuleTest extends BranchFilterModule {
         m.setJob(job);
         final CachingLogger logger = new CachingLogger();
         m.setLogger(logger);
+        m.setXmlUtils(new XMLUtils());
         
         m.processMap(URI.create("main/testuplevels.ditamap"));
         assertXMLEqual(new InputSource(new File(uplevelsExpDir, "main/testuplevels.ditamap").toURI().toString()),
@@ -193,16 +198,14 @@ public class BranchFilterModuleTest extends BranchFilterModule {
 
         final List<String> exp = Arrays.asList(
                 "main/novice.ditaval", "main/advanced.ditaval",
-                "main/kiddo.dita", "main/kiddodefault.dita", "main/parent.dita", "main/parentdefault.dita",
-                "main/parentdefault-1.dita", "main/parent-novice.dita", "main/PREFIX-parent-advanced.dita",
-                "main/PREFIX-weechild-advanced.dita", "main/subdirkiddo.dita", "main/subdirkiddodefault.dita",
-                "main/testuplevels.ditamap", "main/weechilddefault-1.dita", "main/weechild-novice.dita",
-                "main/subdir/PREFIX-weechild-advanced.dita", "main/subdir/weechilddefault-1.dita", "main/subdir/weechild-novice.dita",
-                "peer/peerkiddo.dita", "peer/peerkiddodefault.dita", "peer/peerkiddodefault-1.dita",
-                "peer/peerkiddo-novice.dita", "peer/PREFIX-peerkiddo-advanced.dita",
-                "main/weechild.dita", "main/subdir/weechilddefault.dita",
-                "main/subdir/weechild.dita", "main/weechilddefault.dita");
-        
+                "main/kiddodefault.dita", "main/parentdefault.dita", "main/parentdefault-1.dita", 
+                "main/parent-novice.dita",  "main/PREFIX-parent-advanced.dita", "main/PREFIX-weechild-advanced.dita", 
+                "main/subdirkiddodefault.dita", "main/testuplevels.ditamap", "main/weechilddefault-1.dita", 
+                "main/weechild-novice.dita", "main/subdir/PREFIX-weechild-advanced.dita", 
+                "main/subdir/weechilddefault-1.dita",  "main/subdir/weechild-novice.dita",
+                "peer/peerkiddodefault.dita",  "peer/peerkiddodefault-1.dita",
+                "peer/peerkiddo-novice.dita", "peer/PREFIX-peerkiddo-advanced.dita", "main/weechild.dita", 
+                "main/subdir/weechilddefault.dita", "main/subdir/weechild.dita", "main/weechilddefault.dita");
         assertEquals(exp.size(), job.getFileInfo().size());
         for (final String f : exp) {
             assertNotNull(job.getFileInfo(URI.create(f)));
@@ -268,12 +271,13 @@ public class BranchFilterModuleTest extends BranchFilterModule {
     @Test
     public void testDuplicateTopic() throws IOException, SAXException {
         final BranchFilterModule m = new BranchFilterModule();
-        final Job job = new Job(tempDir);
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(tempDir.toURI());
         job.addAll(getDuplicateTopicFileInfos());
         m.setJob(job);
         final CachingLogger logger = new CachingLogger();
         m.setLogger(logger);
+        m.setXmlUtils(new XMLUtils());
 
         m.processMap(URI.create("test.ditamap"));
 

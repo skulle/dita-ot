@@ -8,6 +8,8 @@
 
 package org.dita.dost.module.reader;
 
+import net.sf.saxon.s9api.QName;
+import net.sf.saxon.s9api.XdmNode;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.exception.DITAOTXMLErrorHandler;
 import org.dita.dost.log.MessageUtils;
@@ -17,34 +19,26 @@ import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.GenListModuleReader.Reference;
 import org.dita.dost.reader.SubjectSchemeReader;
 import org.dita.dost.util.Job.FileInfo;
-import org.dita.dost.util.XMLUtils;
 import org.dita.dost.writer.DebugFilter;
 import org.dita.dost.writer.NormalizeFilter;
 import org.dita.dost.writer.ProfilingFilter;
 import org.dita.dost.writer.ValidationFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLFilter;
 
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
-import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
+import static net.sf.saxon.s9api.streams.Steps.descendant;
 import static org.dita.dost.reader.GenListModuleReader.isFormatDita;
 import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.URLUtils.exists;
-import static org.dita.dost.util.URLUtils.stripFragment;
-import static org.dita.dost.util.URLUtils.toURI;
+import static org.dita.dost.util.URLUtils.*;
 import static org.dita.dost.util.XMLUtils.ancestors;
 import static org.dita.dost.util.XMLUtils.toList;
 import static org.dita.dost.writer.DitaWriterFilter.ATTRIBUTE_NAME_ORIG_FORMAT;
@@ -55,6 +49,12 @@ import static org.dita.dost.writer.DitaWriterFilter.ATTRIBUTE_NAME_ORIG_FORMAT;
  * @since 2.5
  */
 public final class TopicReaderModule extends AbstractReaderModule {
+
+    static final QName QNAME_HREF = new QName(ATTRIBUTE_NAME_HREF);
+    static final QName QNAME_SCOPE = new QName(ATTRIBUTE_NAME_SCOPE);
+    static final QName QNAME_FORMAT = new QName(ATTRIBUTE_NAME_FORMAT);
+    static final QName QNAME_CLASS = new QName(ATTRIBUTE_NAME_CLASS);
+    static final QName QNAME_ORIG_FORMAT = new QName(DITA_OT_NS, ATTRIBUTE_NAME_ORIG_FORMAT);
 
     public TopicReaderModule() {
         super();
@@ -67,6 +67,7 @@ public final class TopicReaderModule extends AbstractReaderModule {
             parseInputParameters(input);
             init();
 
+            readResourceFiles();
             readStartFile();
             processWaitList();
 
@@ -92,6 +93,7 @@ public final class TopicReaderModule extends AbstractReaderModule {
             if (doc != null) {
                 final SubjectSchemeReader subjectSchemeReader = new SubjectSchemeReader();
                 subjectSchemeReader.setLogger(logger);
+                subjectSchemeReader.setJob(job);
                 logger.debug("Loading subject schemes");
                 final List<Element> subjectSchemes = toList(doc.getDocumentElement().getElementsByTagName("*"));
                 subjectSchemes.stream()
@@ -109,6 +111,43 @@ public final class TopicReaderModule extends AbstractReaderModule {
         }
     }
 
+    @Override
+    void readResourceFiles() throws DITAOTException {
+        if (!resources.isEmpty()) {
+            for (URI resource : resources) {
+                additionalResourcesSet.add(resource);
+                final FileInfo fi = job.getFileInfo(resource);
+                if (fi == null) {
+                    addToWaitList(new Reference(resource));
+                } else {
+                    if (ATTR_FORMAT_VALUE_DITAMAP.equals(fi.format)) {
+                        getStartDocuments(fi).forEach(this::addToWaitList);
+                    } else {
+                        if (fi.format == null) {
+                            fi.format = ATTR_FORMAT_VALUE_DITA;
+                            job.add(fi);
+                        }
+                        addToWaitList(new Reference(resource, fi.format));
+                    }
+                }
+            }
+            processWaitList();
+
+            additionalResourcesSet.addAll(hrefTargetSet);
+            additionalResourcesSet.addAll(conrefTargetSet);
+            additionalResourcesSet.addAll(nonConrefCopytoTargetSet);
+            additionalResourcesSet.addAll(outDitaFilesSet);
+            additionalResourcesSet.addAll(conrefpushSet);
+            additionalResourcesSet.addAll(keyrefSet);
+            additionalResourcesSet.addAll(resourceOnlySet);
+            additionalResourcesSet.addAll(fullTopicSet);
+            additionalResourcesSet.addAll(fullMapSet);
+            additionalResourcesSet.addAll(conrefSet);
+
+            resourceOnlySet.clear();
+        }
+    }
+
     private Document getMapDocument() throws SAXException {
         final FileInfo fi = job.getFileInfo(f -> f.isInput).iterator().next();
         if (fi == null) {
@@ -117,20 +156,20 @@ public final class TopicReaderModule extends AbstractReaderModule {
         final URI currentFile = job.tempDirURI.resolve(fi.uri);
         try {
             logger.debug("Reading " + currentFile);
-            return XMLUtils.getDocumentBuilder().parse(new InputSource(currentFile.toString()));
-        } catch (final SAXException | IOException e) {
+            return job.getStore().getDocument(currentFile);
+        } catch (final IOException e) {
             throw new SAXException("Failed to parse " + currentFile, e);
         }
     }
 
     @Override
     public void readStartFile() throws DITAOTException {
-        FileInfo fi = job.getFileInfo(f -> f.isInput).iterator().next();
+        final FileInfo fi = job.getFileInfo(f -> f.isInput).iterator().next();
         if (fi == null) {
             addToWaitList(new Reference(job.getInputFile()));
         } else {
             if (ATTR_FORMAT_VALUE_DITAMAP.equals(fi.format)) {
-                getStartDocuments().forEach(this::addToWaitList);
+                getStartDocuments(fi).forEach(this::addToWaitList);
             } else {
                 if (fi.format == null) {
                     fi.format = ATTR_FORMAT_VALUE_DITA;
@@ -141,59 +180,47 @@ public final class TopicReaderModule extends AbstractReaderModule {
         }
     }
 
-    private List<Reference> getStartDocuments() throws DITAOTException {
+    private List<Reference> getStartDocuments(final FileInfo startFileInfo) throws DITAOTException {
         final List<Reference> res = new ArrayList<>();
-        final FileInfo startFileInfo = job.getFileInfo(f -> f.isInput).iterator().next();
         assert startFileInfo.src != null;
         final URI tmp = job.tempDirURI.resolve(startFileInfo.uri);
-        final Source source = new StreamSource(tmp.toString());
-        logger.info("Reading " + tmp);
         try {
-            final XMLStreamReader in = XMLInputFactory.newInstance().createXMLStreamReader(source);
-            while (in.hasNext()) {
-                int eventType = in.next();
-                switch (eventType) {
-                    case START_ELEMENT:
-                        final String cls = in.getAttributeValue(null, ATTRIBUTE_NAME_CLASS);
-                        if (!MAP_TOPICREF.matches(cls)) {
-                            break;
-                        }
-                        final URI href = getHref(in);
-                        if (href != null) {
-                            FileInfo fi = job.getFileInfo(startFileInfo.src.resolve(href));
-                            if (fi == null) {
-                                fi = job.getFileInfo(tmp.resolve(href));
-                            }
-                            assert fi != null;
-                            assert fi.src != null;
-                            String format = in.getAttributeValue(DITA_OT_NS, ATTRIBUTE_NAME_ORIG_FORMAT);
-                            if (format == null) {
-                                format = in.getAttributeValue(null, ATTRIBUTE_NAME_FORMAT);
-                            }
-                            res.add(new Reference(fi.src, format));
-                            nonConrefCopytoTargetSet.add(fi.src);
-                        }
-                        break;
-                    default:
-                        break;
+            final XdmNode source = job.getStore().getImmutableNode(tmp);
+            logger.info("Reading " + tmp);
+            final Predicate<? super XdmNode> isTopicref = xdmItem -> MAP_TOPICREF.matches(xdmItem.getAttributeValue(QNAME_CLASS));
+            source.select(descendant(isTopicref)).forEach(xdmItem -> {
+                final URI href = getHref(xdmItem);
+                if (href != null) {
+                    FileInfo fi = job.getFileInfo(startFileInfo.src.resolve(href));
+                    if (fi == null) {
+                        fi = job.getFileInfo(tmp.resolve(href));
+                    }
+                    assert fi != null;
+                    assert fi.src != null;
+                    String format = xdmItem.getAttributeValue(QNAME_ORIG_FORMAT);
+                    if (format == null) {
+                        format = xdmItem.getAttributeValue(QNAME_FORMAT);
+                    }
+                    res.add(new Reference(fi.src, format));
+                    nonConrefCopytoTargetSet.add(fi.src);
                 }
-            }
-        } catch (final XMLStreamException e) {
+            });
+        } catch (final IOException e) {
             throw new DITAOTException(e);
         }
         return res;
     }
 
-    private URI getHref(final XMLStreamReader in) {
-        final URI href = toURI(in.getAttributeValue(null, ATTRIBUTE_NAME_HREF));
+    private URI getHref(final XdmNode in) {
+        final URI href = toURI(in.getAttributeValue(QNAME_HREF));
         if (href == null) {
             return null;
         }
-        final String scope = in.getAttributeValue(null, ATTRIBUTE_NAME_SCOPE);
+        final String scope = in.getAttributeValue(QNAME_SCOPE);
         if (!(scope == null || scope.equals(ATTR_SCOPE_VALUE_LOCAL))) {
             return null;
         }
-        final String format = in.getAttributeValue(null, ATTRIBUTE_NAME_FORMAT);
+        final String format = in.getAttributeValue(QNAME_FORMAT);
         if (!(format == null || ATTR_FORMAT_VALUE_DITA.equals(format))) {
             return null;
         }

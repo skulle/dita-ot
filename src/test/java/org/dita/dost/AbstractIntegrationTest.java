@@ -12,7 +12,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import nu.validator.htmlparser.dom.HtmlDocumentBuilder;
 import org.apache.tools.ant.*;
+import org.dita.dost.store.CacheStore;
+import org.dita.dost.store.Store;
 import org.dita.dost.util.FileUtils;
+import org.dita.dost.util.Job;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.w3c.dom.*;
@@ -21,6 +24,9 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.*;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -36,26 +42,57 @@ import static org.dita.dost.TestUtils.assertXMLEqual;
 import static org.dita.dost.util.Constants.*;
 import static org.junit.Assert.assertArrayEquals;
 
-public class AbstractIntegrationTest {
+public abstract class AbstractIntegrationTest {
 
     /**
      * Message codes where duplicates are ignored in message count.
      */
     private static final String[] ignoreDuplicates = new String[]{"DOTJ037W"};
 
+    enum Transtype {
+        PREPROCESS("xhtml", true, "preprocess",
+                "build-init", "preprocess"),
+        XHTML("xhtml", false, "xhtml",
+                "dita2xhtml"),
+        HTML5("html5", false, "html5",
+                "dita2html5"),
+        PDF("pdf", false, "pdf",
+                "dita2pdf2"),
+        ECLIPSEHELP("eclipsehelp", false,"eclipsehelp",
+                "dita2eclipsehelp"),
+        HTMLHELP("htmlhelp", false, "htmlhelp",
+                "dita2htmlhelp"),
+        PREPROCESS2("xhtml", true, "preprocess",
+                "build-init", "preprocess2"),
+        XHTML_WITH_PREPROCESS2("xhtml", false, "xhtml",
+                "dita2xhtml.init", "build-init", "preprocess2", "xhtml.topics", "dita.map.xhtml");
+
+        final String name;
+        final boolean compareTemp;
+        public final String exp;
+        final String[] targets;
+        Transtype(String name, boolean compareTemp, String exp, String... targets) {
+            this.name = name;
+            this.compareTemp = compareTemp;
+            this.exp = exp;
+            this.targets = targets;
+        }
+
+        @Override
+        public String toString() {
+            return this.name().toLowerCase();
+        }
+    }
+
+    // Builder
+
     private String name;
     private Transtype transtype;
     private String[] targets;
     private Path input;
     private Map<String, Object> args = new HashMap<>();
-    private List<TestListener.Message> log;
-    private File actDir;
     private int warnCount = 0;
     private int errorCount = 0;
-
-    public static AbstractIntegrationTest builder() {
-        return new AbstractIntegrationTest();
-    }
 
     public AbstractIntegrationTest name(String name) {
         this.name = name;
@@ -67,9 +104,7 @@ public class AbstractIntegrationTest {
         return this;
     }
 
-    Transtype getTranstype(Transtype transtype) {
-        return transtype;
-    }
+    abstract Transtype getTranstype(Transtype transtype);
 
     public AbstractIntegrationTest targets(String... targets) {
         this.targets = targets;
@@ -96,38 +131,10 @@ public class AbstractIntegrationTest {
         return this;
     }
 
-    enum Transtype {
-        PREPROCESS("xhtml", true,
-                "build-init", "preprocess"),
-        XHTML("xhtml", false,
-                "dita2xhtml"),
-        HTML5("html5", false,
-                "dita2html5"),
-        PDF("pdf", false,
-                "dita2pdf2"),
-        ECLIPSEHELP("eclipsehelp", false,
-                "dita2eclipsehelp"),
-        HTMLHELP("htmlhelp", false,
-                "dita2htmlhelp"),
-        PREPROCESS2("xhtml", true,
-                "build-init", "preprocess2"),
-        XHTML_WITH_PREPROCESS2("xhtml", false,
-                "dita2xhtml.init", "build-init", "preprocess2", "xhtml.topics", "dita.map.xhtml");
+    // Runner
 
-        final String name;
-        final boolean compareTemp;
-        final String[] targets;
-        Transtype(String name, boolean compareTemp, String... targets) {
-            this.name = name;
-            this.compareTemp = compareTemp;
-            this.targets = targets;
-        }
-
-        @Override
-        public String toString() {
-            return this.name().toLowerCase();
-        }
-    }
+    private List<TestListener.Message> log;
+    private File actDir;
 
     protected static final Map<String, Pattern> htmlIdPattern = new HashMap<>();
     protected static final Map<String, Pattern> ditaIdPattern = new HashMap<>();
@@ -230,7 +237,13 @@ public class AbstractIntegrationTest {
     }
 
     protected AbstractIntegrationTest compare() throws Throwable {
-        final File exp = Paths.get("src", "test", "resources", name, EXP_DIR, transtype.toString()).toFile();
+        File exp = Paths.get("src", "test", "resources", name, EXP_DIR, transtype.toString()).toFile();
+        if (!exp.exists()) {
+            exp = Paths.get("src", "test", "resources", name, EXP_DIR, transtype.exp).toFile();
+        }
+        if (!exp.exists()) {
+            throw new RuntimeException("Unable to find expected output directory");
+        }
         final File act = actDir.toPath().resolve(transtype.toString()).toFile();
 
         compare(exp, act);
@@ -380,6 +393,7 @@ public class AbstractIntegrationTest {
      */
     private List<TestListener.Message> runOt(final File srcDir, final Transtype transtype, final File tempBaseDir, final File resBaseDir,
                                              final Map<String, String> args, final String[] targets) throws Exception {
+//        System.out.println(transtype);
         final File tempDir = new File(tempBaseDir, transtype.toString());
         final File resDir = new File(resBaseDir, transtype.toString());
         deleteDirectory(resDir);
@@ -420,6 +434,28 @@ public class AbstractIntegrationTest {
                 ts.addAll(Arrays.asList(transtype.targets));
             }
             project.executeTargets(ts);
+
+            final Store store = project.getReference(ANT_REFERENCE_STORE);
+
+            if (store != null && store instanceof CacheStore) {
+                final Job job = new Job(tempDir.getAbsoluteFile(), store);
+                for (Job.FileInfo fileInfo : job.getFileInfo()) {
+                    if (fileInfo.uri != null) {
+                        final URI f = job.tempDirURI.resolve(fileInfo.uri);
+                        if (store.exists(f)) {
+                            final Path dir = Paths.get(f).getParent();
+                            if (!Files.exists(dir)) {
+                                Files.createDirectories(dir);
+                            }
+                            try (final InputStream inputStream = store.getInputStream(f)) {
+                                Files.copy(inputStream, Paths.get(f));
+                            } catch (NoSuchFileException | FileNotFoundException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            }
 
             return listener.messages;
         } finally {
@@ -467,7 +503,7 @@ public class AbstractIntegrationTest {
     }
 
     final Set<String> compareable = ImmutableSet.of("html", "htm", "xhtml", "hhk", "xml", "dita", "ditamap", "txt");
-    final Set<String> ignorable = ImmutableSet.of("schemekeydef.xml", "keydef.xml", "subrelation.xml", ".job.xml");
+    final Set<String> ignorable = ImmutableSet.of("keydef.xml", "subrelation.xml", ".job.xml");
 
     private Collection<String> getFiles(File expDir, File actDir) {
         final FileFilter filter = f -> f.isDirectory()
@@ -512,6 +548,9 @@ public class AbstractIntegrationTest {
     }
 
     private Document parseXml(final File f) throws SAXException, IOException {
+        if (!f.exists()) {
+            throw new AssertionError(new FileNotFoundException(f.toString()));
+        }
         final Document d = db.parse(f);
         final NodeList elems = d.getElementsByTagName("*");
         for (int i = 0; i < elems.getLength(); i++) {
@@ -522,6 +561,8 @@ public class AbstractIntegrationTest {
             // remove DITA version and domains attributes
             e.removeAttributeNS(DITA_NAMESPACE, ATTRIBUTE_NAME_DITAARCHVERSION);
             e.removeAttribute(ATTRIBUTE_NAME_DOMAINS);
+            e.removeAttribute(ATTRIBUTE_NAME_SPECIALIZATIONS);
+            e.removeAttributeNS(DITA_OT_NS, "submap-specializations");
             // remove workdir processing instructions
             removeWorkdirProcessingInstruction(e);
         }
@@ -672,7 +713,7 @@ public class AbstractIntegrationTest {
                     // out.println(event.getMessage());
                     break;
                 default:
-                    err.println(message);
+//                    err.println(message);
             }
 
             messages.add(new TestListener.Message(level, message));

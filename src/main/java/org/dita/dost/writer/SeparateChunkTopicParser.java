@@ -8,7 +8,6 @@
  */
 package org.dita.dost.writer;
 
-import org.dita.dost.exception.DITAOTXMLErrorHandler;
 import org.dita.dost.util.Job.FileInfo;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -16,10 +15,8 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
-import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.AttributesImpl;
 
-import javax.xml.parsers.DocumentBuilder;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -28,8 +25,6 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedList;
 
-import static org.apache.commons.io.FileUtils.deleteQuietly;
-import static org.apache.commons.io.FileUtils.moveFile;
 import static org.dita.dost.module.GenMapAndTopicListModule.ELEMENT_STUB;
 import static org.dita.dost.reader.ChunkMapReader.*;
 import static org.dita.dost.util.Constants.*;
@@ -43,7 +38,6 @@ import static org.dita.dost.util.XMLUtils.*;
  */
 public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
 
-    private final XMLReader reader;
     // stub is used as the anchor to mark where to insert generated child
     // topicref inside current topicref
     private Element stub;
@@ -55,20 +49,6 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
     final Deque<Writer> outputStack = new ArrayDeque<>();
     final Deque<Element> stubStack = new ArrayDeque<>();
     final Deque<String> lang = new LinkedList<>();
-
-    /**
-     * Constructor.
-     */
-    public SeparateChunkTopicParser() {
-        super();
-        try {
-            reader = getXMLReader();
-            reader.setContentHandler(this);
-            reader.setFeature(FEATURE_NAMESPACE_PREFIX, true);
-        } catch (final Exception e) {
-            throw new RuntimeException("Failed to initialize XML parser: " + e.getMessage(), e);
-        }
-    }
 
     @Override
     public void write(final URI currentFile) {
@@ -153,13 +133,15 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
                 outputFileName = resolve(resolveBase, copytoValue.toString());
             }
 
-            if (new File(outputFileName).exists()) {
+            if (job.getStore().exists(outputFileName)) {
                 final URI t = outputFileName;
                 outputFileName = resolve(resolveBase, generateFilename());
                 conflictTable.put(outputFileName, t);
                 dotchunk = false;
             }
-            output = new OutputStreamWriter(new FileOutputStream(new File(outputFileName)), StandardCharsets.UTF_8);
+
+            final OutputStream out = job.getStore().getOutputStream(outputFileName);
+            output = new OutputStreamWriter(out, StandardCharsets.UTF_8);
             outputFile = outputFileName;
 
             if (!dotchunk) {
@@ -188,9 +170,8 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
                 rootTopicref.getParentNode().appendChild(siblingStub);
             }
 
-            reader.setErrorHandler(new DITAOTXMLErrorHandler(currentParsingFile.getPath(), logger));
             logger.info("Processing " + currentParsingFile);
-            reader.parse(currentParsingFile.toString());
+            job.getStore().transform(currentParsingFile, this);
             output.flush();
 
             removeStubElements();
@@ -204,12 +185,12 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
                     output.close();
                     output = null;
                     if (dotchunk) {
-                        final File dst = new File(currentParsingFile);
-                        final File src = new File(outputFile);
-                        logger.debug("Delete " + currentParsingFile);
-                        deleteQuietly(dst);
+                        if (job.getStore().exists(currentParsingFile)) {
+                            logger.debug("Delete " + currentParsingFile);
+                            job.getStore().delete(currentParsingFile);
+                        }
                         logger.debug("Move " + outputFile + " to " + currentParsingFile);
-                        moveFile(src, dst);
+                        job.getStore().move(outputFile, currentParsingFile);
                         final FileInfo fi = job.getFileInfo(outputFile);
                         if (fi != null) {
                             job.remove(fi);
@@ -258,11 +239,10 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
      * @return element.
      */
     private Element getTopicDoc(final URI absolutePathToFile) {
-        final DocumentBuilder builder = getDocumentBuilder();
         try {
-            final Document doc = builder.parse(absolutePathToFile.toString());
+            final Document doc = job.getStore().getDocument(absolutePathToFile);
             return doc.getDocumentElement();
-        } catch (final SAXException | IOException e) {
+        } catch (final IOException e) {
             logger.error("Failed to parse " + absolutePathToFile + ": " + e.getMessage(), e);
         }
         return null;
@@ -327,7 +307,8 @@ public final class SeparateChunkTopicParser extends AbstractChunkTopicParser {
                     outputFileNameStack.push(outputFile);
 
                     outputFile = generateOutputFilename(id);
-                    output = new OutputStreamWriter(new FileOutputStream(new File(outputFile)), StandardCharsets.UTF_8);
+                    final OutputStream out = job.getStore().getOutputStream(outputFile);
+                    output = new OutputStreamWriter(out, StandardCharsets.UTF_8);
 
                     if (atts.getIndex(ATTRIBUTE_NAME_XML_LANG) < 0 && currentLang != null) {
                         attsMod.addAttribute("", ATTRIBUTE_NAME_LANG, ATTRIBUTE_NAME_XML_LANG, "CDATA", currentLang );

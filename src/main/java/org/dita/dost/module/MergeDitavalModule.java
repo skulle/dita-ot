@@ -48,7 +48,6 @@ public final class MergeDitavalModule extends AbstractPipelineModuleImpl {
 
     /** Absolute paths for filter files. */
     private final List<File> ditavalFiles = new LinkedList<>();
-    private File ditaDir = null;
 
     @Override
     public AbstractPipelineOutput execute(final AbstractPipelineInput input) throws DITAOTException {
@@ -72,7 +71,6 @@ public final class MergeDitavalModule extends AbstractPipelineModuleImpl {
 
     private void parseInputParameters(final AbstractPipelineInput input) {
         final File basedir = toFile(input.getAttribute(ANT_INVOKER_PARAM_BASEDIR));
-        ditaDir = toFile(input.getAttribute(ANT_INVOKER_EXT_PARAM_DITADIR));
         if (input.getAttribute(ANT_INVOKER_PARAM_DITAVAL) != null) {
             final String[] allDitavalFiles = input.getAttribute(ANT_INVOKER_PARAM_DITAVAL).split(File.pathSeparator);
             for (final String oneDitavalFile : allDitavalFiles) {
@@ -105,10 +103,9 @@ public final class MergeDitavalModule extends AbstractPipelineModuleImpl {
 
     private void writeMergedDitaval() throws DITAOTException {
         final DocumentBuilder ditavalbuilder = XMLUtils.getDocumentBuilder();
-        CatalogUtils.setDitaDir(ditaDir);
         ditavalbuilder.setEntityResolver(CatalogUtils.getCatalogResolver());
         XMLStreamWriter export = null;
-        try (OutputStream exportStream = new FileOutputStream(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL))) {
+        try (OutputStream exportStream = job.getStore().getOutputStream(new File(job.tempDir, FILE_NAME_MERGED_DITAVAL).toURI())) {
             export = XMLOutputFactory.newInstance().createXMLStreamWriter(exportStream, "UTF-8");
             export.writeStartDocument();
             export.writeStartElement("val");

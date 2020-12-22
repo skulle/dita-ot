@@ -16,7 +16,6 @@ import org.apache.xerces.xni.grammars.XMLGrammarPool;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.log.MessageUtils;
 import org.dita.dost.module.AbstractPipelineModuleImpl;
-import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.reader.*;
 import org.dita.dost.util.*;
@@ -28,16 +27,16 @@ import org.xml.sax.ext.LexicalHandler;
 import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.namespace.QName;
-import javax.xml.transform.Result;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.sax.SAXTransformerFactory;
-import javax.xml.transform.sax.TransformerHandler;
-import javax.xml.transform.stream.StreamResult;
 import java.io.*;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.dita.dost.reader.GenListModuleReader.ROOT_URI;
 import static org.dita.dost.reader.GenListModuleReader.Reference;
@@ -46,7 +45,6 @@ import static org.dita.dost.util.Constants.*;
 import static org.dita.dost.util.Job.FileInfo;
 import static org.dita.dost.util.Job.USER_INPUT_FILE_LIST_FILE;
 import static org.dita.dost.util.URLUtils.*;
-import static org.dita.dost.util.XMLUtils.close;
 
 /**
  * Base class for document reader and serializer.
@@ -57,47 +55,47 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
 
     Predicate<String> formatFilter;
     /** FileInfos keyed by src. */
-    private final Map<URI, FileInfo> fileinfos = new HashMap<>();
+    private final Map<URI, Collection<FileInfo>> fileinfos = new ConcurrentHashMap<>();
     /** Set of all topic files */
-    private final Set<URI> fullTopicSet = new HashSet<>(128);
+    final Set<URI> fullTopicSet = ConcurrentHashMap.newKeySet();
     /** Set of all map files */
-    private final Set<URI> fullMapSet = new HashSet<>(128);
+    final Set<URI> fullMapSet = ConcurrentHashMap.newKeySet();
     /** Set of topic files containing href */
-    private final Set<URI> hrefTopicSet = new HashSet<>(128);
+    private final Set<URI> hrefTopicSet = ConcurrentHashMap.newKeySet();
     /** Set of dita files containing conref */
-    private final Set<URI> conrefSet = new HashSet<>(128);
+    final Set<URI> conrefSet = ConcurrentHashMap.newKeySet();
     /** Set of topic files containing coderef */
-    private final Set<URI> coderefSet = new HashSet<>(128);
+    private final Set<URI> coderefSet = ConcurrentHashMap.newKeySet();
     /** Set of all images */
-    final Set<Reference> formatSet = new HashSet<>();
+    final Set<Reference> formatSet = ConcurrentHashMap.newKeySet();
     /** Set of all images used for flagging */
-    private final Set<URI> flagImageSet = new LinkedHashSet<>(128);
+    private final Set<URI> flagImageSet = ConcurrentHashMap.newKeySet();
     /** Set of all HTML and other non-DITA or non-image files */
     final SetMultimap<String, URI> htmlSet = SetMultimapBuilder.hashKeys().hashSetValues().build();
     /** Set of all the href targets */
-    private final Set<URI> hrefTargetSet = new HashSet<>(128);
+    final Set<URI> hrefTargetSet = ConcurrentHashMap.newKeySet();
     /** Set of all the conref targets */
-    private Set<URI> conrefTargetSet = new HashSet<>(128);
+    Set<URI> conrefTargetSet = ConcurrentHashMap.newKeySet();
     /** Set of all targets except conref and copy-to */
-    final Set<URI> nonConrefCopytoTargetSet = new HashSet<>(128);
+    final Set<URI> nonConrefCopytoTargetSet = ConcurrentHashMap.newKeySet();
     /** Set of subsidiary files */
-    private final Set<URI> coderefTargetSet = new HashSet<>(16);
+    private final Set<URI> coderefTargetSet = ConcurrentHashMap.newKeySet();
     /** Set of absolute flag image files */
-    private final Set<URI> relFlagImagesSet = new LinkedHashSet<>(128);
+    private final Set<URI> relFlagImagesSet = ConcurrentHashMap.newKeySet();
     /** List of files waiting for parsing. Values are absolute URI references. */
     @VisibleForTesting
-    final Queue<Reference> waitList = new LinkedList<>();
+    final NavigableMap<URI, Reference> waitList = new ConcurrentSkipListMap<>();
     /** List of parsed files */
-    final List<URI> doneList = new LinkedList<>();
-    final List<URI> failureList = new LinkedList<>();
+    final Set<URI> doneList = ConcurrentHashMap.newKeySet();
+    final Set<URI> failureList = ConcurrentHashMap.newKeySet();
     /** Set of outer dita files */
-    private final Set<URI> outDitaFilesSet = new HashSet<>(128);
+    final Set<URI> outDitaFilesSet = ConcurrentHashMap.newKeySet();
     /** Set of sources of conacion */
-    private final Set<URI> conrefpushSet = new HashSet<>(128);
+    final Set<URI> conrefpushSet = ConcurrentHashMap.newKeySet();
     /** Set of files containing keyref */
-    private final Set<URI> keyrefSet = new HashSet<>(128);
+    final Set<URI> keyrefSet = ConcurrentHashMap.newKeySet();
     /** Set of files with "@processing-role=resource-only" */
-    private final Set<URI> resourceOnlySet = new HashSet<>(128);
+    final Set<URI> resourceOnlySet = ConcurrentHashMap.newKeySet();
     /** Absolute basedir for processing */
     private URI baseInputDir;
     GenListModuleReader listFilter;
@@ -108,11 +106,12 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     private TempFileNameScheme tempFileNameScheme;
     /** Absolute path to input file. */
     URI rootFile;
+    List<URI> resources;
     /** Subject scheme absolute file paths. */
-    private final Set<URI> schemeSet = new HashSet<>(128);
+    private final Set<URI> schemeSet = ConcurrentHashMap.newKeySet();
     /** Subject scheme usage. Key is absolute file path, value is set of applicable subject schemes. */
     private final Map<URI, Set<URI>> schemeDictionary = new HashMap<>();
-    private final Map<URI, URI> copyTo = new HashMap<>();
+    private final Map<URI, URI> copyTo = new ConcurrentHashMap<>();
     Mode processingMode;
     /** Generate {@code xtrf} and {@code xtrc} attributes */
     boolean genDebugInfo;
@@ -121,8 +120,6 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     /** Profiling is enabled. */
     private boolean profilingEnabled;
     String transtype;
-    /** Absolute DITA-OT base path. */
-    File ditaDir;
     private File ditavalFile;
     FilterUtils filterUtils;
     /** Absolute path to current destination file. */
@@ -135,8 +132,33 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     URI currentFile;
     DitaWriterFilter ditaWriterFilter;
     TopicFragmentFilter topicFragmentFilter;
+    /** Files found during additional resource crawl. **/
+    final Set<URI> additionalResourcesSet = ConcurrentHashMap.newKeySet();
 
     public abstract void readStartFile() throws DITAOTException;
+
+    void readResourceFiles() throws DITAOTException {
+        if (!resources.isEmpty()) {
+            for (URI resource : resources) {
+                additionalResourcesSet.add(resource);
+                addToWaitList(new Reference(resource));
+            }
+            processWaitList();
+
+            additionalResourcesSet.addAll(hrefTargetSet);
+            additionalResourcesSet.addAll(conrefTargetSet);
+            additionalResourcesSet.addAll(nonConrefCopytoTargetSet);
+            additionalResourcesSet.addAll(outDitaFilesSet);
+            additionalResourcesSet.addAll(conrefpushSet);
+            additionalResourcesSet.addAll(keyrefSet);
+            additionalResourcesSet.addAll(resourceOnlySet);
+            additionalResourcesSet.addAll(fullTopicSet);
+            additionalResourcesSet.addAll(fullMapSet);
+            additionalResourcesSet.addAll(conrefSet);
+
+            resourceOnlySet.clear();
+        }
+    }
 
     /**
      * Initialize reusable filters.
@@ -179,11 +201,10 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     /**
      * Init xml reader used for pipeline parsing.
      *
-     * @param ditaDir absolute path to DITA-OT directory
      * @param validate whether validate input file
      * @throws SAXException parsing exception
      */
-    void initXMLReader(final File ditaDir, final boolean validate) throws SAXException {
+    void initXMLReader(final boolean validate) throws SAXException {
         reader = XMLUtils.getXMLReader();
         reader.setFeature(FEATURE_NAMESPACE, true);
         reader.setFeature(FEATURE_NAMESPACE_PREFIX, true);
@@ -208,15 +229,10 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
                 logger.warn("Failed to set Xerces grammar pool for parser: " + e.getMessage());
             }
         }
-        CatalogUtils.setDitaDir(ditaDir);
         reader.setEntityResolver(CatalogUtils.getCatalogResolver());
     }
 
     void parseInputParameters(final AbstractPipelineInput input) {
-        ditaDir = toFile(input.getAttribute(ANT_INVOKER_EXT_PARAM_DITADIR));
-        if (!ditaDir.isAbsolute()) {
-            throw new IllegalArgumentException("DITA-OT installation directory " + ditaDir + " must be absolute");
-        }
         validate = Boolean.valueOf(input.getAttribute(ANT_INVOKER_EXT_PARAM_VALIDATE));
         transtype = input.getAttribute(ANT_INVOKER_EXT_PARAM_TRANSTYPE);
         gramcache = "yes".equalsIgnoreCase(input.getAttribute(ANT_INVOKER_EXT_PARAM_GRAMCACHE));
@@ -256,6 +272,14 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             assert baseInputDir.isAbsolute();
         }
 
+        if (input.getAttribute(ANT_INVOKER_PARAM_RESOURCES) != null) {
+            resources = Stream.of(input.getAttribute(ANT_INVOKER_PARAM_RESOURCES).split(File.pathSeparator))
+                    .map(resource -> new File(resource).toURI())
+                    .collect(Collectors.toList());
+        } else {
+            resources = Collections.emptyList();
+        }
+
         URI ditaInput = toURI(input.getAttribute(ANT_INVOKER_PARAM_INPUTMAP));
         ditaInput = ditaInput != null ? ditaInput : job.getInputFile();
         if (ditaInput.isAbsolute()) {
@@ -285,8 +309,8 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     }
 
     void processWaitList() throws DITAOTException {
-        while (!waitList.isEmpty()) {
-            readFile(waitList.remove(), null);
+        for (Map.Entry<URI, Reference> entry = waitList.pollFirstEntry(); entry != null; entry = waitList.pollFirstEntry()) {
+            readFile(entry.getValue(), null);
         }
     }
 
@@ -333,13 +357,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             job.add(stub);
         }
 
-//        InputSource in = null;
-        Result out = null;
         try {
-            final TransformerFactory tf = TransformerFactory.newInstance();
-            final SAXTransformerFactory stf = (SAXTransformerFactory) tf;
-            final TransformerHandler serializer = stf.newTransformerHandler();
-
             XMLReader parser = getXmlReader(ref.format);
             XMLReader xmlSource = parser;
             for (final XMLFilter f: getProcessingPipe(currentFile)) {
@@ -354,9 +372,8 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
                 parser.setFeature("http://xml.org/sax/features/lexical-handler", true);
             } catch (final SAXNotRecognizedException e) {}
 
-//            in = new InputSource(src.toString());
-            out = new StreamResult(new FileOutputStream(outputFile));
-            serializer.setResult(out);
+            final ContentHandler serializer = job.getStore().getContentHandler(outputFile.toURI());
+
             xmlSource.setContentHandler(serializer);
             xmlSource.parse(src.toString());
 
@@ -409,13 +426,6 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             }
             failureList.add(currentFile);
         } finally {
-            if (out != null) {
-                try {
-                    close(out);
-                } catch (final IOException e) {
-                    logger.error(e.getMessage(), e) ;
-                }
-            }
             if (failureList.contains(currentFile)) {
                 FileUtils.deleteQuietly(outputFile);
             }
@@ -434,7 +444,6 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         doneList.add(currentFile);
         listFilter.reset();
         keydefFilter.reset();
-
     }
 
     /**
@@ -444,7 +453,21 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
      */
     void processParseResult(final URI currentFile) {
         // Category non-copyto result
-        for (final Reference file: listFilter.getNonCopytoResult()) {
+        final Set<Reference> nonCopytoResult = new LinkedHashSet<>(128);
+        nonCopytoResult.addAll(listFilter.getNonConrefCopytoTargets());
+        for (final URI f : listFilter.getConrefTargets()) {
+            nonCopytoResult.add(new Reference(stripFragment(f), listFilter.currentFileFormat()));
+        }
+        for (final URI f : listFilter.getCopytoMap().values()) {
+            nonCopytoResult.add(new Reference(stripFragment(f)));
+        }
+        for (final URI f : listFilter.getIgnoredCopytoSourceSet()) {
+            nonCopytoResult.add(new Reference(stripFragment(f)));
+        }
+        for (final URI filename1 : listFilter.getCoderefTargetSet()) {
+            nonCopytoResult.add(new Reference(stripFragment(filename1)));
+        }
+        for (final Reference file: nonCopytoResult) {
             categorizeReferenceFile(file);
         }
         for (final Map.Entry<URI, URI> e : listFilter.getCopytoMap().entrySet()) {
@@ -456,9 +479,12 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
 
         hrefTargetSet.addAll(listFilter.getHrefTargets());
         conrefTargetSet.addAll(listFilter.getConrefTargets());
-        nonConrefCopytoTargetSet.addAll(listFilter.getNonConrefCopytoTargets());
+        final Set<URI> nonConrefCopytoTargets = listFilter.getNonConrefCopytoTargets().stream()
+                .map(r -> r.filename)
+                .collect(Collectors.toSet());
+        nonConrefCopytoTargetSet.addAll(nonConrefCopytoTargets);
         coderefTargetSet.addAll(listFilter.getCoderefTargets());
-        outDitaFilesSet.addAll(listFilter.getOutFilesSet());
+        outDitaFilesSet.addAll(listFilter.getOutDitaFilesSet());
 
         // Generate topic-scheme dictionary
         final Set<URI> schemeSet = listFilter.getSchemeSet();
@@ -514,7 +540,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
                             .src(currentFile)
                             .format(ref.format)
                             .build();
-                    fileinfos.put(i.src, i);
+                    fileinfos.put(i.src, Collections.singletonList(i));
                 }
             }
             fullTopicSet.add(currentFile);
@@ -542,11 +568,11 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     void addToWaitList(final Reference ref) {
         final URI file = ref.filename;
         assert file.isAbsolute() && file.getFragment() == null;
-        if (doneList.contains(file) || waitList.contains(ref) || file.equals(currentFile)) {
+        if (doneList.contains(file) || waitList.containsKey(ref.filename) || file.equals(currentFile)) {
             return;
         }
 
-        waitList.add(ref);
+        waitList.put(ref.filename, ref);
     }
 
     /**
@@ -577,7 +603,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
      */
     void handleConref() {
         // Get pure conref targets
-        final Set<URI> pureConrefTargets = new HashSet<>(conrefTargetSet.size());
+        final Set<URI> pureConrefTargets = new HashSet<>();
         for (final URI target: conrefTargetSet) {
             if (!nonConrefCopytoTargetSet.contains(target)) {
                 pureConrefTargets.add(target);
@@ -587,6 +613,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         conrefTargetSet = pureConrefTargets;
 
         // Remove pure conref targets from fullTopicSet
+        // XXX: if we remove from fullTopicSet, we don't get format information
         fullTopicSet.removeAll(pureConrefTargets);
     }
 
@@ -610,84 +637,97 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
 
         job.setProperty("tempdirToinputmapdir.relative.value", StringUtils.escapeRegExp(getPrefix(relativeRootFile)));
 
-        resourceOnlySet.addAll(listFilter.getResourceOnlySet());
+        final Set<URI> res = new HashSet<>();
+        res.addAll(listFilter.getResourceOnlySet());
+        res.removeAll(listFilter.getNormalProcessingRoleSet());
+        resourceOnlySet.addAll(res);
 
         for (final URI file: outDitaFilesSet) {
-            getOrCreateFileInfo(fileinfos, file).isOutDita = true;
+            createOrUpdateFileInfo(file, fi -> fi.isOutDita = true);
         }
         for (final URI file: fullTopicSet) {
-            final FileInfo ff = getOrCreateFileInfo(fileinfos, file);
-            if (ff.format == null) {
-                ff.format = ATTR_FORMAT_VALUE_DITA;
-            }
+            createOrUpdateFileInfo(file, fi -> {
+                if (fi.format == null) {
+                    fi.format = ATTR_FORMAT_VALUE_DITA;
+                }
+            });
         }
         for (final URI file: fullMapSet) {
-            final FileInfo ff = getOrCreateFileInfo(fileinfos, file);
-            if (ff.format == null) {
-                ff.format = ATTR_FORMAT_VALUE_DITAMAP;
-            }
+            createOrUpdateFileInfo(file, fi -> {
+                if (fi.format == null) {
+                    fi.format = ATTR_FORMAT_VALUE_DITAMAP;
+                }
+            });
         }
         for (final URI file: hrefTopicSet) {
-            getOrCreateFileInfo(fileinfos, file).hasLink = true;
+            createOrUpdateFileInfo(file, fi -> fi.hasLink = true);
         }
         for (final URI file: conrefSet) {
-            getOrCreateFileInfo(fileinfos, file).hasConref = true;
+            createOrUpdateFileInfo(file, fi -> fi.hasConref = true);
         }
         for (final Reference file: formatSet) {
-            getOrCreateFileInfo(fileinfos, file.filename).format = file.format;
+            createOrUpdateFileInfo(file.filename, fi -> fi.format = file.format);
         }
         for (final URI file: flagImageSet) {
-            final FileInfo f = getOrCreateFileInfo(fileinfos, file);
-            f.isFlagImage = true;
-            f.format = ATTR_FORMAT_VALUE_IMAGE;
+            createOrUpdateFileInfo(file, fi -> {
+                fi.isFlagImage = true;
+                fi.format = ATTR_FORMAT_VALUE_IMAGE;
+            });
         }
         for (final String format: htmlSet.keySet()) {
             for (final URI file : htmlSet.get(format)) {
-                getOrCreateFileInfo(fileinfos, file).format = format;
+                createOrUpdateFileInfo(file, fi -> fi.format = format);
             }
         }
         for (final URI file: hrefTargetSet) {
-            getOrCreateFileInfo(fileinfos, file).isTarget = true;
+            createOrUpdateFileInfo(file, fi -> fi.isTarget = true);
         }
         for (final URI file: schemeSet) {
-            getOrCreateFileInfo(fileinfos, file).isSubjectScheme = true;
+            createOrUpdateFileInfo(file, fi -> fi.isSubjectScheme = true);
         }
         for (final URI file: coderefTargetSet) {
-            final FileInfo f = getOrCreateFileInfo(fileinfos, file);
-            f.isSubtarget = true;
-            if (f.format == null) {
-                f.format = PR_D_CODEREF.localName;
-            }
+            createOrUpdateFileInfo(file, fi -> {
+                fi.isSubtarget = true;
+                if (fi.format == null) {
+                    fi.format = PR_D_CODEREF.localName;
+                }
+            });
         }
         for (final URI file: conrefpushSet) {
-            getOrCreateFileInfo(fileinfos, file).isConrefPush = true;
+            createOrUpdateFileInfo(file, fi -> fi.isConrefPush = true);
         }
         for (final URI file: keyrefSet) {
-            getOrCreateFileInfo(fileinfos, file).hasKeyref = true;
+            createOrUpdateFileInfo(file, fi -> fi.hasKeyref = true);
         }
         for (final URI file: coderefSet) {
-            getOrCreateFileInfo(fileinfos, file).hasCoderef = true;
+            createOrUpdateFileInfo(file, fi -> fi.hasCoderef = true);
         }
         for (final URI file: resourceOnlySet) {
-            getOrCreateFileInfo(fileinfos, file).isResourceOnly = true;
+            createOrUpdateFileInfo(file, fi -> fi.isResourceOnly = true);
+        }
+        for (final URI resource : resources) {
+            createOrUpdateFileInfo(resource, fi -> fi.isInputResource = true);
         }
 
         addFlagImagesSetToProperties(job, relFlagImagesSet);
 
         final Map<URI, URI> filteredCopyTo = filterConflictingCopyTo(copyTo, fileinfos.values());
 
-        for (final FileInfo fs: fileinfos.values()) {
-            if (!failureList.contains(fs.src)) {
-                final URI src = filteredCopyTo.get(fs.src);
-                // correct copy-to
-                if (src != null) {
-                    final FileInfo corr = new FileInfo.Builder(fs).src(src).build();
-                    job.add(corr);
-                } else {
-                    job.add(fs);
-                }
-            }
-        }
+        // Add successful file infos to job
+        fileinfos.values().stream()
+                .flatMap(Collection::stream)
+                .filter(fs -> !failureList.contains(fs.src))
+                .forEach(fs -> {
+                    final URI src = filteredCopyTo.get(fs.src);
+                    // correct copy-to
+                    if (src != null) {
+                        final FileInfo corr = new FileInfo.Builder(fs).src(src).build();
+                        job.add(corr);
+                    } else {
+                        job.add(fs);
+                    }
+                });
+
         for (final URI target : filteredCopyTo.keySet()) {
             final URI tmp = tempFileNameScheme.generateTempFileName(target);
             final URI src = filteredCopyTo.get(target);
@@ -701,6 +741,13 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             }
         }
 
+        for (URI f : additionalResourcesSet) {
+            final FileInfo fi = job.getFileInfo(f);
+            if (!fi.isResourceOnly) {
+                fi.isInputResource = true;
+            }
+        }
+
         final FileInfo root = job.getFileInfo(rootFile);
         if (root == null) {
             throw new RuntimeException("Unable to set input file to job configuration");
@@ -711,17 +758,17 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
 
         try {
             logger.info("Serializing job specification");
-            if (!job.tempDir.exists() && !job.tempDir.mkdirs()) {
-                throw new DITAOTException("Failed to create " + job.tempDir + " directory");
-            }
             job.write();
         } catch (final IOException e) {
             throw new DITAOTException("Failed to serialize job configuration files: " + e.getMessage(), e);
         }
 
         try {
-            SubjectSchemeReader.writeMapToXML(addMapFilePrefix(listFilter.getRelationshipGrap()), new File(job.tempDir, FILE_NAME_SUBJECT_RELATION));
-            SubjectSchemeReader.writeMapToXML(addMapFilePrefix(schemeDictionary), new File(job.tempDir, FILE_NAME_SUBJECT_DICTIONARY));
+            final SubjectSchemeReader subjectSchemeReader = new SubjectSchemeReader();
+            subjectSchemeReader.setLogger(logger);
+            subjectSchemeReader.setJob(job);
+            subjectSchemeReader.writeMapToXML(addMapFilePrefix(listFilter.getRelationshipGrap()), new File(job.tempDir, FILE_NAME_SUBJECT_RELATION));
+            subjectSchemeReader.writeMapToXML(addMapFilePrefix(schemeDictionary), new File(job.tempDir, FILE_NAME_SUBJECT_DICTIONARY));
         } catch (final IOException e) {
             throw new DITAOTException("Failed to serialize subject scheme files: " + e.getMessage(), e);
         }
@@ -736,8 +783,9 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
     }
 
     /** Filter copy-to where target is used directly. */
-    private Map<URI, URI> filterConflictingCopyTo( final Map<URI, URI> copyTo, final Collection<FileInfo> fileInfos) {
+    private Map<URI, URI> filterConflictingCopyTo( final Map<URI, URI> copyTo, final Collection<Collection<FileInfo>> fileInfos) {
         final Set<URI> fileinfoTargets = fileInfos.stream()
+                .flatMap(Collection::stream)
                 .filter(fi -> fi.src.equals(fi.result))
                 .map(fi -> fi.result)
                 .collect(Collectors.toSet());
@@ -752,7 +800,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
      * @param relativeRootFile list value
      */
     private void writeListFile(final File inputfile, final String relativeRootFile) {
-        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(inputfile)))) {
+        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(job.getStore().getOutputStream(inputfile.toURI())))) {
             bufferedWriter.write(relativeRootFile);
             bufferedWriter.flush();
         } catch (final IOException e) {
@@ -777,19 +825,45 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         return res;
     }
 
-    private FileInfo getOrCreateFileInfo(final Map<URI, FileInfo> fileInfos, final URI file) {
+    private void createOrUpdateFileInfo(final URI file, final Consumer<FileInfo> consumer) {
+        for (final FileInfo fi : getOrCreateFileInfo(fileinfos, file)) {
+            consumer.accept(fi);
+        }
+    }
+
+    private Collection<FileInfo> getOrCreateFileInfo(final Map<URI, Collection<FileInfo>> fileInfos, final URI file) {
         assert file.getFragment() == null;
         final URI f = file.normalize();
-        FileInfo.Builder b;
+
         if (fileInfos.containsKey(f)) {
-            b = new FileInfo.Builder(fileInfos.get(f));
+            return fileInfos.get(f);
         } else {
-            b = new FileInfo.Builder().src(file);
+            final Collection<FileInfo> prevs = job.getFileInfo(fi -> Objects.equals(fi.src, f)).stream()
+                    .map(prev -> {
+                        FileInfo.Builder b = new FileInfo.Builder(prev);
+                        if (prev.src == null) {
+                            b = b.src(f);
+                        }
+                        if (prev.uri == null) {
+                            b = b.uri(tempFileNameScheme.generateTempFileName(f));
+                        }
+                        return b.build();
+                    })
+                    .collect(Collectors.toList());
+            if (!prevs.isEmpty()) {
+                fileInfos.put(f, prevs);
+                return prevs;
+            } else {
+                final Collection<FileInfo> fis = Collections.singletonList(
+                        new FileInfo.Builder()
+                                .src(f)
+                                .uri(tempFileNameScheme.generateTempFileName(f))
+                                .build()
+                );
+                fileInfos.put(f, fis);
+                return fis;
+            }
         }
-        b = b.uri(tempFileNameScheme.generateTempFileName(file));
-        final FileInfo i = b.build();
-        fileInfos.put(i.src, i);
-        return i;
     }
 
     /**
@@ -800,7 +874,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         final Map<URI, Set<URI>> res = new HashMap<>();
         for (final Map.Entry<URI, Set<URI>> e: map.entrySet()) {
             final URI key = e.getKey();
-            final Set<URI> newSet = new HashSet<>(e.getValue().size());
+            final Set<URI> newSet = new HashSet<>();
             for (final URI file: e.getValue()) {
                 newSet.add(tempFileNameScheme.generateTempFileName(file));
             }
@@ -831,10 +905,10 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         }
 
         // write list attribute to file
-        final String fileKey = Constants.REL_FLAGIMAGE_LIST.substring(0, Constants.REL_FLAGIMAGE_LIST.lastIndexOf("list")) + "file";
-        prop.setProperty(fileKey, Constants.REL_FLAGIMAGE_LIST.substring(0, Constants.REL_FLAGIMAGE_LIST.lastIndexOf("list")) + ".list");
+        final String fileKey = REL_FLAGIMAGE_LIST.substring(0, REL_FLAGIMAGE_LIST.lastIndexOf("list")) + "file";
+        prop.setProperty(fileKey, REL_FLAGIMAGE_LIST.substring(0, REL_FLAGIMAGE_LIST.lastIndexOf("list")) + ".list");
         final File list = new File(job.tempDir, prop.getProperty(fileKey));
-        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(list)))) {
+        try (Writer bufferedWriter = new BufferedWriter(new OutputStreamWriter(job.getStore().getOutputStream(list.toURI())))) {
             for (URI aNewSet : newSet) {
                 bufferedWriter.write(aNewSet.getPath());
                 bufferedWriter.write('\n');
@@ -844,7 +918,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
             logger.error(e.getMessage(), e) ;
         }
 
-        prop.setProperty(Constants.REL_FLAGIMAGE_LIST, StringUtils.join(newSet, COMMA));
+        prop.setProperty(REL_FLAGIMAGE_LIST, StringUtils.join(newSet, COMMA));
     }
 
     private XMLReader getXmlReader(final String format) throws SAXException {
@@ -871,7 +945,7 @@ public abstract class AbstractReaderModule extends AbstractPipelineModuleImpl {
         }
         tempFileNameScheme.setBaseDir(job.getInputDir());
 
-        initXMLReader(ditaDir, validate);
+        initXMLReader(validate);
         initFilters();
     }
 

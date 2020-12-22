@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+import org.dita.dost.store.StreamStore;
+import org.dita.dost.util.XMLUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -59,7 +61,7 @@ public class DebugAndFilterModuleTest {
         final File outDir = new File(tempDir, "out");
         tmpDir = new File(tempDir, "temp");
         TestUtils.copy(new File(resourceDir, "temp"), tmpDir);
-        final Job job = new Job(tmpDir);
+        final Job job = new Job(tmpDir, new StreamStore(tmpDir, new XMLUtils()));
         for (final Job.FileInfo fi: job.getFileInfo()) {
             job.add(new Job.FileInfo.Builder(fi).src(inputDir.toURI().resolve(fi.uri)).build());
         }
@@ -93,6 +95,7 @@ public class DebugAndFilterModuleTest {
         final DebugAndFilterModule module = new DebugAndFilterModule();
         module.setLogger(new TestUtils.TestLogger());
         module.setJob(job);
+        module.setXmlUtils(new XMLUtils());
         module.setProcessingPipe(Collections.emptyList());
         
         module.execute(pipelineInput);

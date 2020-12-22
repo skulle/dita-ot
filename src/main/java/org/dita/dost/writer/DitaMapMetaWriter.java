@@ -26,8 +26,11 @@ public final class DitaMapMetaWriter extends AbstractDitaMetaWriter {
     private static final List<DitaClass> topicmetaOrder = Collections.unmodifiableList(Arrays.asList(
             TOPIC_NAVTITLE,
             MAP_LINKTEXT,
+            TOPIC_LINKTEXT,
             MAP_SEARCHTITLE,
+            TOPIC_SEARCHTITLE,
             MAP_SHORTDESC,
+            TOPIC_SHORTDESC,
             TOPIC_AUTHOR,
             TOPIC_SOURCE,
             TOPIC_PUBLISHER,
@@ -50,7 +53,7 @@ public final class DitaMapMetaWriter extends AbstractDitaMetaWriter {
     public Document process(final Document doc) {
         Element root = getMatchingTopicElement(doc.getDocumentElement());
         if (hasMetadata(topicmetaOrder)) {
-            final Element prolog = findMetadataContainer(root, topicmetaPosition, TOPIC_PROLOG);
+            final Element prolog = findMetadataContainer(root, topicmetaPosition, MAP_TOPICMETA);
             processMetadata(prolog, topicmetaOrder);
         }
         return doc;

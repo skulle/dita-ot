@@ -8,9 +8,8 @@
 package org.dita.dost.module;
 
 import org.dita.dost.exception.DITAOTException;
-import org.dita.dost.log.DITAOTLogger;
 import org.dita.dost.log.MessageUtils;
-import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
+import org.dita.dost.module.reader.TempFileNameScheme;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.CopyToReader;
@@ -43,7 +42,6 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
     private boolean forceUnique;
     private ForceUniqueFilter forceUniqueFilter;
     private final CopyToReader reader = new CopyToReader();
-    private final XMLUtils xmlUtils = new XMLUtils();
 
     @Override
     public void setJob(final Job job) {
@@ -54,12 +52,6 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
             throw new RuntimeException(e);
         }
         tempFileNameScheme.setBaseDir(job.getInputDir());
-    }
-
-    @Override
-    public void setLogger(final DITAOTLogger logger) {
-        super.setLogger(logger);
-        xmlUtils.setLogger(logger);
     }
 
     @Override
@@ -96,7 +88,7 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
 
         final List<XMLFilter> pipe = getProcessingPipe(in);
 
-        xmlUtils.transform(in, pipe);
+        job.getStore().transform(in, pipe);
     }
 
     /**
@@ -166,7 +158,7 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
             final URI srcFile = job.tempDirURI.resolve(copytoSource);
             final URI targetFile = job.tempDirURI.resolve(copytoTarget);
 
-            if (new File(targetFile).exists()) {
+            if (job.getStore().exists(targetFile)) {
                 logger.warn(MessageUtils.getMessage("DOTX064W", copytoTarget.getPath()).toString());
             } else {
                 final FileInfo input = job.getFileInfo(fi -> fi.isInput).iterator().next();
@@ -201,17 +193,13 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
         assert !copytoTargetFilename.isAbsolute();
         assert inputMapInTemp.isAbsolute();
         final File workdir = new File(target).getParentFile();
-        if (!workdir.exists() && !workdir.mkdirs()) {
-            logger.error("Failed to create copy-to target directory " + workdir.toURI());
-            return;
-        }
         final File path2project = getPathtoProject(copytoTargetFilename, target, inputMapInTemp, job);
         final File path2rootmap = getPathtoRootmap(target, inputMapInTemp);
         XMLFilter filter = new CopyToFilter(workdir, path2project, path2rootmap, src, target);
 
         logger.info("Processing " + src + " to " + target);
         try {
-            xmlUtils.transform(src, target, Collections.singletonList(filter));
+            job.getStore().transform(src, target, Collections.singletonList(filter));
         } catch (final DITAOTException e) {
             logger.error("Failed to write copy-to file: " + e.getMessage(), e);
         }
@@ -282,7 +270,7 @@ public final class CopyToModule extends AbstractPipelineModuleImpl {
                     }
                     break;
                 case PI_WORKDIR_TARGET_URI:
-                    d = workdir.toURI().toString();
+                    d = toDirURI(workdir).toString();
                     break;
                 case PI_PATH2PROJ_TARGET:
                     if (path2project != null) {

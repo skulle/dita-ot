@@ -7,35 +7,24 @@
  */
 package org.dita.dost.reader;
 
-import static org.dita.dost.TestUtils.assertXMLEqual;
-import java.io.File;
-import java.io.IOException;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.sax.SAXSource;
-import javax.xml.transform.stream.StreamResult;
-
-import org.dita.dost.util.Job;
-import org.dita.dost.util.XMLUtils;
-import org.xml.sax.InputSource;
-
-import org.apache.xml.resolver.tools.ResolvingXMLReader;
-
-import org.xml.sax.XMLReader;
-
-import org.apache.xml.resolver.tools.CatalogResolver;
-
-import org.xml.sax.SAXException;
-
 import org.dita.dost.TestUtils;
 import org.dita.dost.exception.DITAOTException;
+import org.dita.dost.store.StreamStore;
 import org.dita.dost.util.CatalogUtils;
+import org.dita.dost.util.Job;
+import org.dita.dost.util.XMLUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+
+import static org.dita.dost.TestUtils.assertXMLEqual;
 
 public class MapMetaReaderTest {
 
@@ -44,7 +33,6 @@ public class MapMetaReaderTest {
     private static final File expDir = new File(resourceDir, "exp");
     private static File tempDir;
     private static MapMetaReader reader;
-    //private static final File baseDir = new File(resourceDir, "DITA-OT1.5");
 
     @BeforeClass
     public static void setUp() throws Exception{
@@ -56,7 +44,7 @@ public class MapMetaReaderTest {
 
         reader = new MapMetaReader();
         reader.setLogger(new TestUtils.TestLogger());
-        reader.setJob(new Job(tempDir));
+        reader.setJob(new Job(tempDir, new StreamStore(tempDir, new XMLUtils())));
 
         final File mapFile = new File(tempDir, "test.ditamap");
         reader.read(mapFile.getAbsoluteFile());

@@ -92,14 +92,16 @@ public final class ProfilingFilter extends AbstractXMLFilter {
             throws SAXException {
         Set<Flag> flags = null;
 
-        final DitaClass cls = atts.getValue(ATTRIBUTE_NAME_CLASS) != null ? new DitaClass(atts.getValue(ATTRIBUTE_NAME_CLASS)) : new DitaClass("");
-
+        final DitaClass cls = atts.getValue(ATTRIBUTE_NAME_CLASS) != null ? DitaClass.getInstance(atts) : DitaClass.getInstance("");
         if (cls.isValid() && (TOPIC_TOPIC.matches(cls) || MAP_MAP.matches(cls))) {
             final String domains = atts.getValue(ATTRIBUTE_NAME_DOMAINS);
-            if (domains == null) {
-                logger.info(MessageUtils.getMessage("DOTJ029I", localName).toString());
-            } else {
+            if (domains != null) {
                 props = StringUtils.getExtProps(domains);
+            } else {
+                final String specializations = atts.getValue(ATTRIBUTE_NAME_SPECIALIZATIONS);
+                if (specializations != null) {
+                    props = StringUtils.getExtPropsFromSpecializations(specializations);
+                }
             }
         }
 

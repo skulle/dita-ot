@@ -7,35 +7,37 @@
  */
 package org.dita.dost.util;
 
-import static org.dita.dost.util.Configuration.configuration;
-import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.URLUtils.*;
-
-import org.xml.sax.helpers.DefaultHandler;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Field;
-import java.net.URI;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-
-import org.dita.dost.module.GenMapAndTopicListModule;
-import org.dita.dost.module.GenMapAndTopicListModule.TempFileNameScheme;
+import org.dita.dost.exception.DITAOTException;
+import org.dita.dost.module.reader.TempFileNameScheme;
+import org.dita.dost.store.Store;
+import org.w3c.dom.Document;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+import javax.xml.transform.Result;
+import javax.xml.transform.dom.DOMResult;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import static org.dita.dost.util.Configuration.configuration;
+import static org.dita.dost.util.Constants.*;
+import static org.dita.dost.util.URLUtils.*;
 
 /**
  * Definition of current job.
@@ -91,10 +93,6 @@ public final class Job {
     private static final String PROPERTY_INPUT_MAP = "InputMapDir";
     private static final String PROPERTY_INPUT_MAP_URI = "InputMapDir.uri";
 
-    /** File name for key definition file */
-    public static final String KEYDEF_LIST_FILE = "keydef.xml";
-    /** File name for key definition file */
-    public static final String SUBJECT_SCHEME_KEYDEF_LIST_FILE = "schemekeydef.xml";
     /** File name for temporary input file list file */
     public static final String USER_INPUT_FILE_LIST_FILE = "usr.input.file.list";
 
@@ -124,22 +122,26 @@ public final class Job {
     public final File tempDir;
     public final URI tempDirURI;
     private final File jobFile;
-    private final ConcurrentMap<URI, FileInfo> files = new ConcurrentHashMap<>();
+    private final Map<URI, FileInfo> files = new ConcurrentHashMap<>();
     private long lastModified;
+    private final Store store;
 
     /**
      * Create new job configuration instance. Initialise by reading temporary configuration files.
      *
      * @param tempDir temporary directory
+     * @param store IO store
      * @throws IOException if reading configuration files failed
      * @throws IllegalStateException if configuration files are missing
      */
-    public Job(final File tempDir) throws IOException {
+    public Job(final File tempDir, final Store store) throws IOException {
         if (!tempDir.isAbsolute()) {
             throw new IllegalArgumentException("Temporary directory " + tempDir + " must be absolute");
         }
         this.tempDir = tempDir;
-        tempDirURI = tempDir.toURI();
+        this.store = store;
+        final URI tmpDirUri = tempDir.toURI();
+        tempDirURI = tmpDirUri.toString().endsWith("/") ? tmpDirUri : URI.create(tmpDirUri + "/");
         jobFile = new File(tempDir, JOB_FILE);
         prop = new HashMap<>();
         read();
@@ -150,12 +152,25 @@ public final class Job {
         }
     }
 
+    public Job(final Job job, final Map<String, Object> prop, final Collection<FileInfo> files) {
+        this.tempDir = job.tempDir;
+        this.store = job.store;
+        this.tempDirURI = tempDir.toURI();
+        this.jobFile = new File(tempDir, JOB_FILE);
+        this.prop = prop;
+        this.files.putAll(files.stream().collect(Collectors.toMap(fi -> fi.uri, Function.identity())));
+    }
+
+    public Store getStore() {
+        return store;
+    }
+
     /**
      * Test if serialized configuration file has been updated.
      * @return {@code true} if configuration file has been update after this object has been created or serialized
      */
     public boolean isStale() {
-        return jobFile.lastModified() > lastModified;
+        return getStore().getLastModified(jobFile.toURI()) > lastModified;
     }
 
     /**
@@ -166,14 +181,11 @@ public final class Job {
      * @throws IllegalStateException if configuration files are missing
      */
     private void read() throws IOException {
-        lastModified = jobFile.lastModified();
-        if (jobFile.exists()) {
+        lastModified = getStore().getLastModified(jobFile.toURI());
+        if (getStore().exists(jobFile.toURI())) {
             try (final InputStream in = new FileInputStream(jobFile)) {
-                final XMLReader parser = XMLUtils.getXMLReader();
-                parser.setContentHandler(new JobHandler(prop, files));
-
-                parser.parse(new InputSource(in));
-            } catch (final SAXException e) {
+                getStore().transform(jobFile.toURI(), new JobHandler(prop, files));
+            } catch (final DITAOTException e) {
                 throw new IOException("Failed to read job file: " + e.getMessage());
             }
         } else {
@@ -184,7 +196,7 @@ public final class Job {
         }
     }
 
-    private final static class JobHandler extends DefaultHandler {
+    public final static class JobHandler extends DefaultHandler {
 
         private final Map<String, Object> prop;
         private final Map<URI, FileInfo> files;
@@ -194,7 +206,7 @@ public final class Job {
         private Set<String> set;
         private Map<String, String> map;
 
-        JobHandler(final Map<String, Object> prop, final Map<URI, FileInfo> files) {
+        public JobHandler(final Map<String, Object> prop, final Map<URI, FileInfo> files) {
             this.prop = prop;
             this.files = files;
         }
@@ -298,98 +310,107 @@ public final class Job {
      * @throws IOException if writing configuration files failed
      */
     public void write() throws IOException {
-        OutputStream outStream = null;
-        XMLStreamWriter out = null;
-        try {
-            outStream = new FileOutputStream(jobFile);
-            out = XMLOutputFactory.newInstance().createXMLStreamWriter(outStream, "UTF-8");
-            out.writeStartDocument();
-            out.writeStartElement(ELEMENT_JOB);
-            for (final Map.Entry<String, Object> e: prop.entrySet()) {
-                out.writeStartElement(ELEMENT_PROPERTY);
-                out.writeAttribute(ATTRIBUTE_NAME, e.getKey());
-                if (e.getValue() instanceof String) {
-                    out.writeStartElement(ELEMENT_STRING);
-                    out.writeCharacters(e.getValue().toString());
-                    out.writeEndElement(); //string
-                } else if (e.getValue() instanceof Set) {
-                    out.writeStartElement(ELEMENT_SET);
-                    final Set<?> s = (Set<?>) e.getValue();
-                    for (final Object o: s) {
-                        out.writeStartElement(ELEMENT_STRING);
-                        out.writeCharacters(o.toString());
-                        out.writeEndElement(); //string
+        try (Writer outStream = new BufferedWriter(new OutputStreamWriter(getStore().getOutputStream(jobFile.toURI())))) {
+            XMLStreamWriter out = null;
+            try {
+                out = XMLOutputFactory.newInstance().createXMLStreamWriter(outStream);
+                serialize(out, prop, files.values());
+            } catch (final XMLStreamException e) {
+                throw new IOException("Failed to serialize job file: " + e.getMessage());
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (final XMLStreamException e) {
+                        throw new IOException("Failed to close file: " + e.getMessage());
                     }
-                    out.writeEndElement(); //set
-                } else if (e.getValue() instanceof Map) {
-                    out.writeStartElement(ELEMENT_MAP);
-                    final Map<?, ?> s = (Map<?, ?>) e.getValue();
-                    for (final Map.Entry<?, ?> o: s.entrySet()) {
-                        out.writeStartElement(ELEMENT_ENTRY);
-                        out.writeAttribute(ATTRIBUTE_KEY, o.getKey().toString());
-                        out.writeStartElement(ELEMENT_STRING);
-                        out.writeCharacters(o.getValue().toString());
-                        out.writeEndElement(); //string
-                        out.writeEndElement(); //entry
-                    }
-                    out.writeEndElement(); //string
-                } else {
-                    out.writeStartElement(e.getValue().getClass().getName());
-                    out.writeCharacters(e.getValue().toString());
-                    out.writeEndElement(); //string
                 }
-                out.writeEndElement(); //property
             }
-            out.writeStartElement(ELEMENT_FILES);
-            for (final FileInfo i: files.values()) {
-                out.writeStartElement(ELEMENT_FILE);
-                if (i.src != null) {
-                    out.writeAttribute(ATTRIBUTE_SRC, i.src.toString());
-                }
-                out.writeAttribute(ATTRIBUTE_URI, i.uri.toString());
-                out.writeAttribute(ATTRIBUTE_PATH, i.file.getPath());
-                if (i.result != null) {
-                    out.writeAttribute(ATTRIBUTE_RESULT, i.result.toString());
-                }
-                if (i.format != null) {
-                    out.writeAttribute(ATTRIBUTE_FORMAT, i.format);
-                }
-                try {
-                    for (Map.Entry<String, Field> e: attrToFieldMap.entrySet()) {
-                        final boolean v = e.getValue().getBoolean(i);
-                        if (v) {
-                            out.writeAttribute(e.getKey(), Boolean.TRUE.toString());
-                        }
-                    }
-                } catch (final IllegalAccessException ex) {
-                    throw new RuntimeException(ex);
-                }
-                out.writeEndElement(); //file
-            }
-            out.writeEndElement(); //files
-            out.writeEndElement(); //job
-            out.writeEndDocument();
         } catch (final IOException e) {
             throw new IOException("Failed to write file: " + e.getMessage());
-        } catch (final XMLStreamException e) {
-            throw new IOException("Failed to serialize job file: " + e.getMessage());
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (final XMLStreamException e) {
-                    throw new IOException("Failed to close file: " + e.getMessage());
-                }
-            }
-            if (outStream != null) {
-                try {
-                    outStream.close();
-                } catch (final IOException e) {
-                    throw new IOException("Failed to close file: " + e.getMessage());
-                }
-            }
         }
-        lastModified = jobFile.lastModified();
+        lastModified = getStore().getLastModified(jobFile.toURI());
+    }
+
+    public Document serialize() throws IOException {
+        try {
+            final Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+            final DOMResult result = new DOMResult(doc);
+            XMLStreamWriter out = XMLOutputFactory.newInstance().createXMLStreamWriter(result);
+            serialize(out, prop, files.values());
+            return (Document) result.getNode();
+        } catch (final XMLStreamException | ParserConfigurationException e) {
+            throw new IOException("Failed to serialize job file: " + e.getMessage());
+        }
+    }
+
+    public void serialize(XMLStreamWriter out, Map<String, Object> props, Collection<FileInfo> fs) throws XMLStreamException {
+        out.writeStartDocument();
+        out.writeStartElement(ELEMENT_JOB);
+        for (final Map.Entry<String, Object> e: props.entrySet()) {
+            out.writeStartElement(ELEMENT_PROPERTY);
+            out.writeAttribute(ATTRIBUTE_NAME, e.getKey());
+            if (e.getValue() instanceof String) {
+                out.writeStartElement(ELEMENT_STRING);
+                out.writeCharacters(e.getValue().toString());
+                out.writeEndElement(); //string
+            } else if (e.getValue() instanceof Set) {
+                out.writeStartElement(ELEMENT_SET);
+                final Set<?> s = (Set<?>) e.getValue();
+                for (final Object o: s) {
+                    out.writeStartElement(ELEMENT_STRING);
+                    out.writeCharacters(o.toString());
+                    out.writeEndElement(); //string
+                }
+                out.writeEndElement(); //set
+            } else if (e.getValue() instanceof Map) {
+                out.writeStartElement(ELEMENT_MAP);
+                final Map<?, ?> s = (Map<?, ?>) e.getValue();
+                for (final Map.Entry<?, ?> o: s.entrySet()) {
+                    out.writeStartElement(ELEMENT_ENTRY);
+                    out.writeAttribute(ATTRIBUTE_KEY, o.getKey().toString());
+                    out.writeStartElement(ELEMENT_STRING);
+                    out.writeCharacters(o.getValue().toString());
+                    out.writeEndElement(); //string
+                    out.writeEndElement(); //entry
+                }
+                out.writeEndElement(); //string
+            } else {
+                out.writeStartElement(e.getValue().getClass().getName());
+                out.writeCharacters(e.getValue().toString());
+                out.writeEndElement(); //string
+            }
+            out.writeEndElement(); //property
+        }
+        out.writeStartElement(ELEMENT_FILES);
+        for (final FileInfo i: fs) {
+            out.writeStartElement(ELEMENT_FILE);
+            if (i.src != null) {
+                out.writeAttribute(ATTRIBUTE_SRC, i.src.toString());
+            }
+            out.writeAttribute(ATTRIBUTE_URI, i.uri.toString());
+            out.writeAttribute(ATTRIBUTE_PATH, i.file.getPath());
+            if (i.result != null) {
+                out.writeAttribute(ATTRIBUTE_RESULT, i.result.toString());
+            }
+            if (i.format != null) {
+                out.writeAttribute(ATTRIBUTE_FORMAT, i.format);
+            }
+            try {
+                for (Map.Entry<String, Field> e: attrToFieldMap.entrySet()) {
+                    final boolean v = e.getValue().getBoolean(i);
+                    if (v) {
+                        out.writeAttribute(e.getKey(), Boolean.TRUE.toString());
+                    }
+                }
+            } catch (final IllegalAccessException ex) {
+                throw new RuntimeException(ex);
+            }
+            out.writeEndElement(); //file
+        }
+        out.writeEndElement(); //files
+        out.writeEndElement(); //job
+        out.writeEndDocument();
     }
 
     /**
@@ -619,6 +640,8 @@ public final class Job {
         public boolean isOutDita;
         /** File is input document that is used as processing root. */
         public boolean isInput;
+        /** Additional input resource. */
+        public boolean isInputResource;
 
         FileInfo(final URI src, final URI uri, final File file) {
             if (uri == null && file == null) throw new IllegalArgumentException(new NullPointerException());
@@ -650,6 +673,7 @@ public final class Job {
                     ", isTarget=" + isTarget +
                     ", isConrefPush=" + isConrefPush +
                     ", isInput=" + isInput +
+                    ", isInputResource=" + isInputResource +
                     ", hasKeyref=" + hasKeyref +
                     ", hasCoderef=" + hasCoderef +
                     ", isSubjectScheme=" + isSubjectScheme +
@@ -677,6 +701,7 @@ public final class Job {
                     isFlagImage == fileInfo.isFlagImage &&
                     isOutDita == fileInfo.isOutDita &&
                     isInput == fileInfo.isInput &&
+                    isInputResource == fileInfo.isInputResource &&
                     Objects.equals(src, fileInfo.src) &&
                     Objects.equals(uri, fileInfo.uri) &&
                     Objects.equals(file, fileInfo.file) &&
@@ -687,7 +712,16 @@ public final class Job {
         @Override
         public int hashCode() {
             return Objects.hash(src, uri, file, result, format, hasConref, isChunked, hasLink, isResourceOnly, isTarget,
-                    isConrefPush, hasKeyref, hasCoderef, isSubjectScheme, isSubtarget, isFlagImage, isOutDita, isInput);
+                    isConrefPush, hasKeyref, hasCoderef, isSubjectScheme, isSubtarget, isFlagImage, isOutDita, isInput,
+                    isInputResource);
+        }
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public static Builder builder(final FileInfo fileInfo) {
+            return new Builder(fileInfo);
         }
 
         public static class Builder {
@@ -710,6 +744,7 @@ public final class Job {
             private boolean isFlagImage;
             private boolean isOutDita;
             private boolean isInput;
+            private boolean isInputResource;
 
             public Builder() {}
             public Builder(final FileInfo orig) {
@@ -731,6 +766,7 @@ public final class Job {
                 isFlagImage = orig.isFlagImage;
                 isOutDita = orig.isOutDita;
                 isInput = orig.isInput;
+                isInputResource = orig.isInputResource;
             }
 
             /**
@@ -755,6 +791,7 @@ public final class Job {
                 if (orig.isFlagImage) isFlagImage = orig.isFlagImage;
                 if (orig.isOutDita) isOutDita = orig.isOutDita;
                 if (orig.isInput) isInput = orig.isInput;
+                if (orig.isInputResource) isInputResource = orig.isInputResource;
                 return this;
             }
 
@@ -782,7 +819,7 @@ public final class Job {
             public Builder src(final URI src) { assert src.isAbsolute(); this.src = src; return this; }
             public Builder uri(final URI uri) { this.uri = uri; this.file = null; return this; }
             public Builder file(final File file) { this.file = file; this.uri = null; return this; }
-            public Builder result(final URI result) { assert result.isAbsolute(); this.result = result; return this; }
+            public Builder result(final URI result) { this.result = result; return this; }
             public Builder format(final String format) { this.format = format; return this; }
             public Builder hasConref(final boolean hasConref) { this.hasConref = hasConref; return this; }
             public Builder isChunked(final boolean isChunked) { this.isChunked = isChunked; return this; }
@@ -797,6 +834,7 @@ public final class Job {
             public Builder isFlagImage(final boolean isFlagImage) { this.isFlagImage = isFlagImage; return this; }
             public Builder isOutDita(final boolean isOutDita) { this.isOutDita = isOutDita; return this; }
             public Builder isInput(final boolean isInput) { this.isInput = isInput; return this; }
+            public Builder isInputResource(final boolean isInputResource) { this.isInputResource = isInputResource; return this; }
 
             public FileInfo build() {
                 if (uri == null && file == null) {
@@ -820,6 +858,7 @@ public final class Job {
                 fi.isFlagImage = isFlagImage;
                 fi.isOutDita = isOutDita;
                 fi.isInput = isInput;   
+                fi.isInputResource = isInputResource;
                 return fi;
             }
 
@@ -964,8 +1003,10 @@ public final class Job {
                 .filter(fi -> fi.isInput)
                 .map(fi -> fi.src)
                 .findAny()
-                .orElse(null);
-
+                .orElseGet(() -> Optional.ofNullable((String) prop.get(PROPERTY_INPUT_MAP_URI))
+                        .map(URLUtils::toURI)
+                        .orElse(null)
+                );
     }
 
     /**
@@ -990,7 +1031,7 @@ public final class Job {
             final String cls = Optional
                     .ofNullable(getProperty("temp-file-name-scheme"))
                     .orElse(configuration.get("temp-file-name-scheme"));
-            tempFileNameScheme = (GenMapAndTopicListModule.TempFileNameScheme) Class.forName(cls).newInstance();
+            tempFileNameScheme = (TempFileNameScheme) Class.forName(cls).newInstance();
         } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }

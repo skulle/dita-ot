@@ -7,22 +7,72 @@
  */
 package org.dita.dost.util;
 
-import static javax.xml.XMLConstants.*;
-import static org.junit.Assert.*;
-
-import java.util.Deque;
-import java.util.LinkedList;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import org.w3c.dom.Element;
-import org.w3c.dom.Document;
-import org.w3c.dom.DOMImplementation;
+import net.sf.saxon.Configuration;
+import net.sf.saxon.lib.CollationURIResolver;
+import net.sf.saxon.om.StructuredQName;
+import net.sf.saxon.trans.SymbolicName;
+import org.dita.dost.TestUtils;
+import org.dita.dost.TestUtils.CachingLogger;
+import org.dita.dost.TestUtils.CachingLogger.Message;
+import org.dita.dost.module.DelegatingCollationUriResolverTest;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.w3c.dom.Attr;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.AttributesImpl;
-import org.junit.Test;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.LinkedList;
+
+import static javax.xml.XMLConstants.NULL_NS_URI;
+import static javax.xml.XMLConstants.XML_NS_URI;
+import static org.dita.dost.util.Constants.*;
+import static org.junit.Assert.*;
 
 public class XMLUtilsTest {
+
+    private static final File resourceDir = TestUtils.getResourceDir(XMLUtilsTest.class);
+    private static final File srcDir = new File(resourceDir, "src");
+    private static final File expDir = new File(resourceDir, "exp");
+    private static File tempDir;
+
+
+    @BeforeClass
+    public static void setUp() throws IOException {
+        tempDir = TestUtils.createTempDir(XMLUtilsTest.class);
+    }
+
+    @Test
+    public void configureCollationResolvers() {
+        final net.sf.saxon.Configuration configuration = new Configuration();
+        XMLUtils.configureSaxonCollationResolvers(configuration);
+        final CollationURIResolver collationURIResolver = configuration.getCollationURIResolver();
+        assertTrue(collationURIResolver.getClass().isAssignableFrom(DelegatingCollationUriResolverTest.class));
+    }
+
+    @Test
+    public void configureExtensions() {
+        final net.sf.saxon.Configuration configuration = new Configuration();
+        XMLUtils.configureSaxonExtensions(configuration);
+        final SymbolicName.F functionName = new SymbolicName.F(new StructuredQName("x", "y", "z"), 0);
+        assertTrue(configuration.getIntegratedFunctionLibrary().isAvailable(functionName));
+    }
 
     @Test
     public void testGetPrefix() {
@@ -191,30 +241,103 @@ public class XMLUtilsTest {
          *    </unknown></ditaInForeign></foreign></body></topic>
          */
         Deque<DitaClass> classes = new LinkedList<>();
-        classes.addFirst(new DitaClass("- topic/topic "));
+        classes.addFirst(TOPIC_TOPIC);
         assertFalse(XMLUtils.nonDitaContext(classes));
-        classes.addFirst(new DitaClass("- topic/body "));
+        classes.addFirst(TOPIC_BODY);
         assertFalse(XMLUtils.nonDitaContext(classes));
-        classes.addFirst(new DitaClass("- topic/foreign "));
+        classes.addFirst(TOPIC_FOREIGN);
         assertFalse(XMLUtils.nonDitaContext(classes));
-        classes.addFirst(new DitaClass("nondita"));
+        classes.addFirst(DitaClass.getInstance("nondita"));
         assertTrue(XMLUtils.nonDitaContext(classes));
-        classes.addFirst(new DitaClass(""));
+        classes.addFirst(DitaClass.getInstance(""));
         assertTrue(XMLUtils.nonDitaContext(classes));
         classes.pop();
         classes.pop();
-        classes.addFirst(new DitaClass("+ topic/xref foreign-d/ditaInForeign "));
+        classes.addFirst(DitaClass.getInstance("+ topic/xref foreign-d/ditaInForeign "));
         assertTrue(XMLUtils.nonDitaContext(classes));
-        classes.addFirst(new DitaClass("+ topic/ph "));
+        classes.addFirst(TOPIC_PH);
         assertFalse(XMLUtils.nonDitaContext(classes));
         classes.pop();
         classes.pop();
-        classes.addFirst(new DitaClass("- topic/unknown "));
+        classes.addFirst(TOPIC_UNKNOWN);
         assertTrue(XMLUtils.nonDitaContext(classes));
         classes.addFirst(null);
         assertTrue(XMLUtils.nonDitaContext(classes));
         classes.addFirst(null);
         assertTrue(XMLUtils.nonDitaContext(classes));
+    }
+
+//    @Test
+//    public void transform() throws Exception {
+//        copyFile(new File(srcDir, "test.dita"), new File(tempDir, "test.dita"));
+//        final Job job = new Job(tempDir);
+//        final URI src = new File(tempDir, "test.dita").toURI();
+//
+//        // two filters that assume processing order
+//        final URI act = new File(tempDir, "order.dita").toURI();
+//        job.transform(src, act, Arrays.asList(
+//            (XMLFilter) new XMLFilterImpl() {
+//                @Override
+//                public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
+//                    getContentHandler().startElement(uri, localName + "_x", qName + "_x", atts);
+//                }
+//                @Override
+//                public void endElement(final String uri, final String localName, final String qName) throws SAXException {
+//                    getContentHandler().endElement(uri, localName + "_x", qName + "_x");
+//                }
+//            },
+//            (XMLFilter) new XMLFilterImpl() {
+//                @Override
+//                public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
+//                    getContentHandler().startElement(uri, localName + "_y", qName + "_y", atts);
+//                }
+//                @Override
+//                public void endElement(final String uri, final String localName, final String qName) throws SAXException {
+//                    getContentHandler().endElement(uri, localName + "_y", qName + "_y");
+//                }
+//            }));
+//        TestUtils.assertXMLEqual(new InputSource(new File(expDir, "order.dita").toURI().toString()),
+//                new InputSource(new File(tempDir, "order.dita").toURI().toString()));
+//    }
+//
+//    @Test
+//    public void transform_single() throws Exception {
+//        copyFile(new File(srcDir, "test.dita"), new File(tempDir, "test.dita"));
+//        final Job job = new Job(tempDir);
+//        final URI src = new File(tempDir, "test.dita").toURI();
+//
+//        // single filter that prefixes each element name
+//        final URI act = new File(tempDir, "single.dita").toURI();
+//        job.transform(src, act, Arrays.asList((XMLFilter) new XMLFilterImpl() {
+//            @Override
+//            public void startElement(final String uri, final String localName, final String qName, final Attributes atts) throws SAXException {
+//                getContentHandler().startElement(uri, localName + "_x", qName + "_x", atts);
+//            }
+//            @Override
+//            public void endElement(final String uri, final String localName, final String qName) throws SAXException {
+//                getContentHandler().endElement(uri, localName + "_x", qName + "_x");
+//            }
+//        }));
+//        TestUtils.assertXMLEqual(new InputSource(new File(expDir, "single.dita").toURI().toString()),
+//                       new InputSource(new File(tempDir, "single.dita").toURI().toString()));
+//    }
+//
+//    @Test
+//    public void transform_empty() throws Exception {
+//        copyFile(new File(srcDir, "test.dita"), new File(tempDir, "test.dita"));
+//        final Job job = new Job(tempDir);
+//        final URI src = new File(tempDir, "test.dita").toURI();
+//
+//        // identity without a filter
+//        final URI act = new File(tempDir, "identity.dita").toURI();
+//        job.transform(src, act, Collections.EMPTY_LIST);
+//        TestUtils.assertXMLEqual(new InputSource(new File(expDir, "identity.dita").toURI().toString()),
+//                       new InputSource(new File(tempDir, "identity.dita").toURI().toString()));
+//    }
+
+    @AfterClass
+    public static void tearDown() throws IOException {
+        TestUtils.forceDelete(tempDir);
     }
 
 }

@@ -14,6 +14,7 @@ import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.util.Job;
 import org.dita.dost.util.Job.FileInfo;
+import org.dita.dost.util.XMLUtils;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -44,6 +45,11 @@ public class DummyPipelineModule implements AbstractPipelineModule {
     }
 
     @Override
+    public void setXmlUtils(final XMLUtils xmlUtils) {
+        // NOOP
+    }
+
+    @Override
     public void setFileInfoFilter(Predicate<FileInfo> fileInfoFilter) {
         // Noop
     }
@@ -53,4 +59,8 @@ public class DummyPipelineModule implements AbstractPipelineModule {
         // Noop
     }
 
+    @Override
+    public void setParallel(final boolean parallel) {
+        // Noop
+    }
 }

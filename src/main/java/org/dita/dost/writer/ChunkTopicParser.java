@@ -15,7 +15,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
-import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.AttributesImpl;
 
 import java.io.*;
@@ -40,20 +39,18 @@ import static org.dita.dost.util.XMLUtils.*;
  */
 public final class ChunkTopicParser extends AbstractChunkTopicParser {
 
-    private final XMLReader reader;
-
     /**
      * Constructor.
      */
     public ChunkTopicParser() {
         super();
-        try {
-            reader = getXMLReader();
-            reader.setContentHandler(this);
-            reader.setFeature(FEATURE_NAMESPACE_PREFIX, true);
-        } catch (final Exception e) {
-            throw new RuntimeException("Failed to initialize XML parser: " + e.getMessage(), e);
-        }
+//        try {
+//            reader = getXMLReader();
+//            reader.setContentHandler(this);
+//            reader.setFeature(FEATURE_NAMESPACE_PREFIX, true);
+//        } catch (final Exception e) {
+//            throw new RuntimeException("Failed to initialize XML parser: " + e.getMessage(), e);
+//        }
     }
 
     @Override
@@ -149,7 +146,7 @@ public final class ChunkTopicParser extends AbstractChunkTopicParser {
                     }
 
                     // Check if there is any conflict
-                    if (new File(outputFileName).exists() && !MAP_MAP.matches(classValue)) {
+                    if (job.getStore().exists(outputFileName) && !MAP_MAP.matches(classValue)) {
                         final URI t = outputFileName;
                         outputFileName = generateOutputFile(currentFile);
                         conflictTable.put(outputFileName, t);
@@ -203,7 +200,8 @@ public final class ChunkTopicParser extends AbstractChunkTopicParser {
                     currentParsingFileTopicIDChangeTable = new HashMap<>();
                     // TODO recursive point
                     logger.info("Processing " + currentParsingFile);
-                    reader.parse(currentParsingFile.toString());
+                    job.getStore().transform(currentParsingFile, this);
+//                    reader.parse(currentParsingFile.toString());
                     if (currentParsingFileTopicIDChangeTable.size() > 0) {
                         final URI href = toURI(topicref.getAttribute(ATTRIBUTE_NAME_HREF));
                         final String pathtoElem = href.getFragment() != null
@@ -294,7 +292,7 @@ public final class ChunkTopicParser extends AbstractChunkTopicParser {
     private void writeToContentChunk(final String tmpContent, final URI outputFileName, final boolean needWriteDitaTag) throws IOException {
         assert outputFileName.isAbsolute();
         logger.info("Writing " + outputFileName);
-        try (OutputStreamWriter ditaFileOutput = new OutputStreamWriter(new FileOutputStream(new File(outputFileName)), StandardCharsets.UTF_8)) {
+        try (Writer ditaFileOutput = new OutputStreamWriter(job.getStore().getOutputStream(outputFileName), StandardCharsets.UTF_8)) {
             if (outputFileName.equals(changeTable.get(outputFileName))) {
                 // if the output file is newly generated file
                 // write the xml header and workdir PI into new file

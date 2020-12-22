@@ -8,8 +8,10 @@
 
 package org.dita.dost.module;
 
+import org.dita.dost.store.StreamStore;
 import org.dita.dost.util.Job;
 import org.dita.dost.util.Job.FileInfo.Builder;
+import org.dita.dost.util.XMLUtils;
 import org.junit.Test;
 
 import java.io.File;
@@ -33,15 +35,28 @@ public class CleanPreprocessModuleTest {
 
     @Test
     public void getBaseDir() throws Exception {
-        final Job job = new Job(new File("").getAbsoluteFile());
+        final File tempDir = new File("").getAbsoluteFile();
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(URI.create("file:/foo/bar/"));
         job.add(new Builder()
                 .uri(create("map.ditamap"))
+                .isInput(true)
                 .result(create("file:/foo/bar/map.ditamap"))
                 .build());
         job.add(new Builder()
                 .uri(create("topics/topic.dita"))
                 .result(create("file:/foo/bar/topics/topic.dita"))
+                .build());
+        job.add(new Builder()
+                .uri(create("topics/null.dita"))
+                .build());
+        job.add(new Builder()
+                .uri(create("topics/task.dita"))
+                .result(create("file:/foo/bar/topics/task.dita"))
+                .build());
+        job.add(new Builder()
+                .uri(create("common/topic.dita"))
+                .result(create("file:/foo/bar/common/topic.dita"))
                 .build());
         module.setJob(job);
         assertEquals(create("file:/foo/bar/"), module.getBaseDir());
@@ -49,10 +64,12 @@ public class CleanPreprocessModuleTest {
 
     @Test
     public void getBaseDirExternal() throws Exception {
-        final Job job = new Job(new File("").getAbsoluteFile());
+        final File tempDir = new File("").getAbsoluteFile();
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(URI.create("file:/foo/bar/"));
         job.add(new Builder()
                 .uri(create("map.ditamap"))
+                .isInput(true)
                 .result(create("file:/foo/bar/map.ditamap"))
                 .build());
         job.add(new Builder()
@@ -65,10 +82,12 @@ public class CleanPreprocessModuleTest {
 
     @Test
     public void getBaseDirSubdir() throws Exception {
-        final Job job = new Job(new File("").getAbsoluteFile());
+        final File tempDir = new File("").getAbsoluteFile();
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(URI.create("file:/foo/bar/maps/"));
         job.add(new Builder()
                 .uri(create("maps/map.ditamap"))
+                .isInput(true)
                 .result(create("file:/foo/bar/maps/map.ditamap"))
                 .build());
         job.add(new Builder()
@@ -81,10 +100,12 @@ public class CleanPreprocessModuleTest {
 
     @Test
     public void getBaseDirSupdir() throws Exception {
-        final Job job = new Job(new File("").getAbsoluteFile());
+        final File tempDir = new File("").getAbsoluteFile();
+        final Job job = new Job(tempDir, new StreamStore(tempDir, new XMLUtils()));
         job.setInputDir(URI.create("file:/foo/bar/maps/"));
         job.add(new Builder()
                 .uri(create("maps/map.ditamap"))
+                .isInput(true)
                 .result(create("file:/foo/bar/maps/map.ditamap"))
                 .build());
         job.add(new Builder()

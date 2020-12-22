@@ -8,23 +8,20 @@
  */
 package org.dita.dost.module;
 
-import org.apache.tools.ant.util.FileUtils;
-import org.apache.xml.resolver.tools.CatalogResolver;
+import net.sf.saxon.s9api.*;
+import net.sf.saxon.trans.UncheckedXPathException;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.reader.MapMetaReader;
 import org.dita.dost.util.CatalogUtils;
-import org.dita.dost.util.Configuration;
+import org.dita.dost.util.DelegatingURIResolver;
 import org.dita.dost.util.Job.FileInfo;
-import org.dita.dost.util.XMLUtils;
-import org.dita.dost.util.XMLUtils.DebugURIResolver;
 import org.dita.dost.writer.DitaMapMetaWriter;
 import org.dita.dost.writer.DitaMetaWriter;
 import org.w3c.dom.Element;
 
-import javax.xml.transform.*;
-import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +33,8 @@ import java.util.Map.Entry;
 import static org.dita.dost.util.Constants.*;
 import static org.dita.dost.util.URLUtils.stripFragment;
 import static org.dita.dost.util.URLUtils.toFile;
-import static org.dita.dost.util.XMLUtils.withLogger;
+import static org.dita.dost.util.XMLUtils.toErrorListener;
+import static org.dita.dost.util.XMLUtils.toMessageListener;
 
 /**
  * Cascades metadata from maps to topics and then from topics to maps.
@@ -74,72 +72,51 @@ final class MoveMetaModule extends AbstractPipelineModuleImpl {
     private void pullTopicMetadata(final AbstractPipelineInput input, final Collection<FileInfo> fis) throws DITAOTException {
         // Pull metadata (such as navtitle) into the map from the referenced topics
         final File styleFile = new File(input.getAttribute(ANT_INVOKER_EXT_PARAM_STYLE));
+        logger.info("Loading stylesheet " + styleFile);
+        final XsltExecutable xsltExecutable;
+        try {
+            xsltExecutable = xmlUtils.getProcessor().newXsltCompiler().compile(new StreamSource(styleFile));
+        } catch (SaxonApiException e) {
+            throw new RuntimeException("Failed to compile stylesheet '" + styleFile.toURI() + "': " + e.getMessage(), e);
+        }
+
         for (final FileInfo f : fis) {
             final File inputFile = new File(job.tempDir, f.file.getPath());
             final File tmp = new File(inputFile.getAbsolutePath() + ".tmp" + Long.toString(System.currentTimeMillis()));
-            if (!tmp.getParentFile().exists() && !tmp.getParentFile().mkdirs()) {
-                throw new DITAOTException("Failed to create directory " + tmp.getParent());
-            }
             logger.info("Processing " + inputFile.toURI());
             logger.debug("Processing " + inputFile.toURI() + " to " + tmp.toURI());
 
-            Source source = null;
-            Result result = null;
             try {
-                source = new StreamSource(inputFile.toURI().toString());
-                result = new StreamResult(tmp);
+                final XsltTransformer transformer = xsltExecutable.load();
+                transformer.setErrorListener(toErrorListener(logger));
+                transformer.setURIResolver(new DelegatingURIResolver(CatalogUtils.getCatalogResolver(), job.getStore()));
+                transformer.setMessageListener(toMessageListener(logger));
 
-                logger.info("Loading stylesheet " + styleFile);
-                final TransformerFactory tf = TransformerFactory.newInstance();
-                final CatalogResolver xmlCatalog = CatalogUtils.getCatalogResolver();
-                tf.setURIResolver(xmlCatalog);
-                final Transformer t = withLogger(tf.newTransformer(new StreamSource(styleFile)), logger);
-                final URIResolver resolver;
-                if (Configuration.DEBUG) {
-                    resolver = new DebugURIResolver(xmlCatalog);
-                } else {
-                    resolver = xmlCatalog;
-                }
-                t.setURIResolver(resolver);
                 for (Entry<String, String> e : input.getAttributes().entrySet()) {
                     logger.debug("Set parameter " + e.getKey() + " to '" + e.getValue() + "'");
-                    t.setParameter(e.getKey(), e.getValue());
+                    transformer.setParameter(new QName(e.getKey()), XdmItem.makeValue(e.getValue()));
                 }
 
-                t.transform(source, result);
+                final Source source = job.getStore().getSource(inputFile.toURI());
+                transformer.setSource(source);
+                final Destination result = job.getStore().getDestination(tmp.toURI());
+                result.setDestinationBaseURI(inputFile.toURI());
+                transformer.setDestination(result);
+                transformer.transform();
+            } catch (final UncheckedXPathException e) {
+                throw new DITAOTException("Failed to transform document", e);
             } catch (final RuntimeException e) {
                 throw e;
-            } catch (final TransformerConfigurationException e) {
-                throw new RuntimeException("Failed to compile stylesheet '" + styleFile.toURI() + "': " + e.getMessage(), e);
-            } catch (final TransformerException e) {
-                throw new DITAOTException("Failed to transform document: " + e.getMessageAndLocation(), e);
+            } catch (final SaxonApiException e) {
+                throw new DITAOTException("Failed to transform document: " + e.getMessage(), e);
             } catch (final Exception e) {
                 throw new DITAOTException("Failed to transform document: " + e.getMessage(), e);
-            } finally {
-                try {
-                    XMLUtils.close(source);
-                } catch (final IOException e) {
-                    // NOOP
-                }
-                try {
-                    XMLUtils.close(result);
-                } catch (final IOException e) {
-                    // NOOP
-                }
             }
             try {
                 logger.debug("Moving " + tmp.toURI() + " to " + inputFile.toURI());
-                if (!inputFile.delete()) {
-                    throw new IOException("Failed to to delete input file " + inputFile.toURI());
-                }
-                if (!tmp.renameTo(inputFile)) {
-                    throw new IOException("Failed to to replace input file " + inputFile.toURI());
-                }
+                job.getStore().move(tmp.toURI(), inputFile.toURI());
             } catch (final IOException e) {
                 throw new DITAOTException("Failed to replace document: " + e.getMessage(), e);
-            } finally {
-                logger.debug("Remove " + tmp.toURI());
-                FileUtils.delete(tmp);
             }
         }
     }
@@ -164,8 +141,7 @@ final class MoveMetaModule extends AbstractPipelineModuleImpl {
                 assert targetFileName.isAbsolute();
                 if (fi.format != null && ATTR_FORMAT_VALUE_DITAMAP.equals(fi.format)) {
                     mapInserter.setMetaTable(entry.getValue());
-                    if (toFile(targetFileName).exists()) {
-                        logger.info("Processing " + targetFileName);
+                    if (job.getStore().exists(targetFileName)) {
                         try {
                             mapInserter.read(toFile(targetFileName));
                         } catch (DITAOTException e) {
@@ -174,7 +150,6 @@ final class MoveMetaModule extends AbstractPipelineModuleImpl {
                     } else {
                         logger.error("File " + targetFileName + " does not exist");
                     }
-
                 }
             }
             //process topic
@@ -194,16 +169,11 @@ final class MoveMetaModule extends AbstractPipelineModuleImpl {
                     final String topicid = entry.getKey().getFragment();
                     topicInserter.setTopicId(topicid);
                     topicInserter.setMetaTable(entry.getValue());
-                    if (toFile(targetFileName).exists()) {
-                        try {
-                            topicInserter.read(toFile(targetFileName));
-                        } catch (DITAOTException e) {
-                            logger.error("Failed to read " + targetFileName + ": " + e.getMessage(), e);
-                        }
-                    } else {
-                        logger.error("File " + targetFileName + " does not exist");
+                    try {
+                        topicInserter.read(toFile(targetFileName));
+                    } catch (DITAOTException e) {
+                        logger.error("Failed to read " + targetFileName + ": " + e.getMessage(), e);
                     }
-
                 }
             }
         }

@@ -7,29 +7,30 @@
  */
 package org.dita.dost.module;
 
-import com.google.common.io.Files;
+import net.sf.saxon.s9api.*;
+import net.sf.saxon.trans.UncheckedXPathException;
+import net.sf.saxon.trans.XPathException;
 import org.dita.dost.exception.DITAOTException;
 import org.dita.dost.pipeline.AbstractPipelineInput;
 import org.dita.dost.pipeline.AbstractPipelineOutput;
 import org.dita.dost.util.CatalogUtils;
+import org.dita.dost.util.DelegatingURIResolver;
 import org.dita.dost.util.Job.FileInfo;
 import org.dita.dost.util.XMLUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import javax.xml.transform.*;
-import javax.xml.transform.dom.DOMResult;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.sax.SAXTransformerFactory;
-import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.Source;
 import javax.xml.transform.stream.StreamSource;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 
 import static org.dita.dost.reader.GenListModuleReader.KEYREF_ATTRS;
 import static org.dita.dost.util.Constants.*;
-import static org.dita.dost.util.XMLUtils.withLogger;
+import static org.dita.dost.util.XMLUtils.toErrorListener;
+import static org.dita.dost.util.XMLUtils.toMessageListener;
 
 /**
  * Recursively inline map references in maps.
@@ -38,28 +39,20 @@ import static org.dita.dost.util.XMLUtils.withLogger;
  */
 final class MaprefModule extends AbstractPipelineModuleImpl {
 
-    private final SAXTransformerFactory transformerFactory;
-
-    private Templates templates;
-    private Transformer serializer;
-
-    public MaprefModule() {
-        transformerFactory = (SAXTransformerFactory) TransformerFactory.newInstance();
-        transformerFactory.setURIResolver(CatalogUtils.getCatalogResolver());
-    }
+    private Processor processor;
+    private XsltExecutable templates;
 
     private void init(final AbstractPipelineInput input) {
-        final File styleFile = new File(input.getAttribute(ANT_INVOKER_EXT_PARAM_STYLE));
+        processor = xmlUtils.getProcessor();
+        final XsltCompiler xsltCompiler = processor.newXsltCompiler();
+        xsltCompiler.setErrorListener(toErrorListener(logger));
+        final File style = new File(input.getAttribute(ANT_INVOKER_EXT_PARAM_STYLE));
         try {
-            templates = transformerFactory.newTemplates(new StreamSource(styleFile));
-            serializer = transformerFactory.newTransformer();
-        } catch (TransformerConfigurationException e) {
-            throw new RuntimeException("Failed to compile " + styleFile + ": " + e.getMessageAndLocation(), e);
+            templates = xsltCompiler.compile(new StreamSource(style));
+        } catch (SaxonApiException e) {
+            throw new RuntimeException("Failed to compile stylesheet '" + style.getAbsolutePath() + "': " + e.getMessage(), e);
         }
 
-        if (fileInfoFilter == null) {
-            fileInfoFilter = fileInfo -> fileInfo.format != null && fileInfo.format.equals(ATTR_FORMAT_VALUE_DITAMAP);
-        }
     }
 
     /**
@@ -69,9 +62,15 @@ final class MaprefModule extends AbstractPipelineModuleImpl {
      */
     @Override
     public AbstractPipelineOutput execute(final AbstractPipelineInput input) throws DITAOTException {
-        init(input);
-
+        if (fileInfoFilter == null) {
+            fileInfoFilter = fileInfo -> fileInfo.format != null && fileInfo.format.equals(ATTR_FORMAT_VALUE_DITAMAP);
+        }
         final Collection<FileInfo> fileInfos = job.getFileInfo(fileInfoFilter);
+        if (fileInfos.isEmpty()) {
+            return null;
+        }
+
+        init(input);
         for (FileInfo fileInfo : fileInfos) {
             processMap(fileInfo);
         }
@@ -94,18 +93,33 @@ final class MaprefModule extends AbstractPipelineModuleImpl {
 
         logger.info("Processing " + inputFile.toURI());
         Document doc;
-        try (InputStream in = new BufferedInputStream(new FileInputStream(inputFile))) {
+        try {
             doc = XMLUtils.getDocumentBuilder().newDocument();
-            final Source source = new StreamSource(in, inputFile.toURI().toString());
-            final Result result = new DOMResult(doc);
-            final Transformer transformer = withLogger(templates.newTransformer(), logger);
-            transformer.setURIResolver(CatalogUtils.getCatalogResolver());
-            transformer.setParameter("file-being-processed", inputFile.getName());
-            transformer.transform(source, result);
+            final XsltTransformer transformer = templates.load();
+            transformer.setErrorListener(toErrorListener(logger));
+            transformer.setURIResolver(new DelegatingURIResolver(CatalogUtils.getCatalogResolver(), job.getStore()));
+            transformer.setMessageListener(toMessageListener(logger));
+
+            transformer.setParameter(new QName("file-being-processed"), XdmItem.makeValue(inputFile.getName()));
+
+            final Source source = job.getStore().getSource(inputFile.toURI());
+            transformer.setSource(source);
+            final Destination serializer = new DOMDestination(doc);
+            serializer.setDestinationBaseURI(inputFile.toURI());
+            transformer.setDestination(serializer);
+            transformer.transform();
+        } catch (final UncheckedXPathException e) {
+            throw new DITAOTException("Failed to merge map " + inputFile, e);
         } catch (final RuntimeException e) {
             throw e;
-        } catch (final TransformerException e) {
-            throw new DITAOTException("Failed to merge map " + inputFile + ": " + e.getMessageAndLocation(), e);
+        } catch (final SaxonApiException e) {
+            try {
+                throw e.getCause();
+            } catch (final XPathException cause) {
+                throw new DITAOTException("Failed to merge map " + inputFile + ": " + cause.getMessageAndLocation(), e);
+            } catch (Throwable throwable) {
+                throw new DITAOTException("Failed to merge map " + inputFile + ": " + e.getMessage(), e);
+            }
         } catch (final Exception e) {
             throw new DITAOTException("Failed to merge map " + inputFile + ": " + e.getMessage(), e);
         }
@@ -113,15 +127,10 @@ final class MaprefModule extends AbstractPipelineModuleImpl {
         final FileInfo updated = collectJobInfo(input, doc);
         job.add(updated);
 
-        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(outputFile))) {
-            final Source source = new DOMSource(doc);
-            final Result result = new StreamResult(out);
-            serializer.transform(source, result);
-        } catch (final RuntimeException e) {
-            throw e;
-        } catch (final TransformerException e) {
-            throw new DITAOTException("Failed to serialize map " + inputFile + ": " + e.getMessageAndLocation(), e);
-        } catch (final Exception e) {
+        try {
+            doc.setDocumentURI(outputFile.toURI().toString());
+            job.getStore().writeDocument(doc, outputFile.toURI());
+        } catch (final IOException e) {
             throw new DITAOTException("Failed to serialize map " + inputFile + ": " + e.getMessage(), e);
         }
     }
@@ -155,7 +164,7 @@ final class MaprefModule extends AbstractPipelineModuleImpl {
         final File inputFile = new File(job.tempDir, input.file.getPath() + FILE_EXTENSION_TEMP);
         final File outputFile = new File(job.tempDir, input.file.getPath());
         try {
-            Files.move(inputFile, outputFile);
+            job.getStore().move(inputFile.toURI(), outputFile.toURI());
         } catch (final IOException e) {
             throw new DITAOTException("Failed to replace temporary file " + inputFile + ": " + e.getMessage(), e);
         }
