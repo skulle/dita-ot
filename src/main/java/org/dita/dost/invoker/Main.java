@@ -1083,6 +1083,7 @@ public class Main extends org.apache.tools.ant.Main implements AntMain {
         }
 
         final Project project = new Project();
+        project.addBuildListener(new PerformanceTracker());
         project.setCoreLoader(coreLoader);
 
         Throwable error = null;
