@@ -3,6 +3,7 @@ import java.nio.file.Paths
 import static groovy.io.FileType.FILES
 
 def licenses = [
+        [name: 'mongo-java-driver', title: 'mongo-java-driver', license: ['apache2.txt']],
         [name: 'avalon-framework', title: 'Avalon Framework', license: ['apache2.txt']],
         [name: 'batik', title: 'Batik', license: ['apache2.txt']],
         [name: 'pdfbox', title: 'PDFBox', license: ['apache2.txt']],
@@ -20,6 +21,7 @@ def licenses = [
         [name: 'jcl-over-slf4j', title: 'SLF4J', license: ['mit-slf4j.txt']],
         [name: 'logback', title: 'Logback', license: ['epl-1.0.txt']],
         [name: 'jackson', title: 'Jackson', license: ['apache2.txt']],
+        [name: 'snakeyaml', title: 'SnakeYAML', license: ['apache2.txt']],
         [name: 'jing', title: 'Jing', license: ['bsd-jing.txt']],
         [name: 'isorelax', title: 'Isorelax', license: ['isorelax.txt']],
         [name: 'gradle-wrapper'],
