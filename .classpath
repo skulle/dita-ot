@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src/main/java"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.htmlhelp/src/main/java"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.htmlhelp/src/test/java"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.pdf2.axf/src"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.pdf2.axf/test"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.pdf2.xep/src"/>
+	<classpathentry kind="src" path="src/main/plugins/org.dita.pdf2/src"/>
+	<classpathentry kind="src" path="src/test/java"/>
+	<classpathentry kind="src" path="src/test/resources/coderef_source/src"/>
+	<classpathentry kind="src" output="bin/main" path="src/main/resources">
+		<attributes>
+			<attribute name="gradle_scope" value="main"/>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8/"/>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.mongodb/mongo-java-driver/3.12.7/1f45c6a397feeb46da75425619333d1cc6f90f78/mongo-java-driver-3.12.7.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.mongodb/mongo-java-driver/3.12.7/61f586a5ad690e61260a85541a7c6956be05e6e6/mongo-java-driver-3.12.7-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/commons-io/commons-io/2.8.0/92999e26e6534606b5678014e66948286298a35c/commons-io-2.8.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/commons-io/commons-io/2.8.0/eec0d4cb359930f0a7c8a9c5147019ef2cd77757/commons-io-2.8.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.relaxng/jing/20181222/d847e7f2685866a0a3783508669a881313a959ab/jing-20181222.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.relaxng/jing/20181222/c80333d99fa5701c338a94f400cdc17f4a132d59/jing-20181222-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xerces/xercesImpl/2.12.0/f02c844149fd306601f20e0b34853a670bef7fa2/xercesImpl-2.12.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xerces/xercesImpl/2.12.0/826f6fc0619cb459bd21964688223d816f2f78a7/xercesImpl-2.12.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xml-apis/xml-apis/1.4.01/3789d9fada2d3d458c4ba2de349d48780f381ee3/xml-apis-1.4.01.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xml-apis/xml-apis/1.4.01/5502da0c4c0a7916a604356ef19394ccfa30cd4b/xml-apis-1.4.01-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xml-resolver/xml-resolver/1.2/3d0f97750b3a03e0971831566067754ba4bfd68c/xml-resolver-1.2.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xml-resolver/xml-resolver/1.2/6b72432ea1c5296783007365bb7c9a6b39dfb730/xml-resolver-1.2-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.sf.saxon/Saxon-HE/9.9.1-7/7d6fc62c28fa5cbf9c7e6697138e843f25dda542/Saxon-HE-9.9.1-7.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.sf.saxon/Saxon-HE/9.9.1-7/5b5487a948f8abc4b856652fdb23985e6da4fce5/Saxon-HE-9.9.1-7-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.ibm.icu/icu4j/61.1/28d33b5e44e72edcc66a5da7a34a42147f38d987/icu4j-61.1.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.ibm.icu/icu4j/61.1/df1b5d109cd3734abc5ea028b48c67b5a1a44365/icu4j-61.1-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant/1.10.9/a8a0c9bc4473acdac25832d0a9da2ca9fd9cd35f/ant-1.10.9.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant/1.10.9/fbe8e3c7b76e7f056fea58bed7c4833e1d44814e/ant-1.10.9-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant-launcher/1.10.9/bcc582424a533933d9960b7a4ccde12c6f257245/ant-launcher-1.10.9.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant-launcher/1.10.9/ed5656611e50acfc973968b977e8f69e9a5cca95/ant-launcher-1.10.9-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.google.guava/guava/25.1-jre/6c57e4b22b44e89e548b5c9f70f0c45fe10fb0b4/guava-25.1-jre.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.google.guava/guava/25.1-jre/ec0056d1a09168a8772c7a6459804a3c85ce8796/guava-25.1-jre-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-classic/1.2.3/7c4f3c474fb2c041d8028740440937705ebb473a/logback-classic-1.2.3.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-classic/1.2.3/cfd5385e0c5ed1c8a5dce57d86e79cf357153a64/logback-classic-1.2.3-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.25/da76ca59f6a57ee3102f8f9bd9cee742973efa8a/slf4j-api-1.7.25.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.25/962153db4a9ea71b79d047dfd1b2a0d80d8f4739/slf4j-api-1.7.25-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml/2.11.0/f5314fe164fc1e3bdcaf20fe0851759917312d9e/jackson-dataformat-yaml-2.11.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml/2.11.0/f4ef41d65712c329880231967d5315daab0041e5/jackson-dataformat-yaml-2.11.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.11.0/8f5aaf3878b0647ff3a16610af53b1a5c05d9f15/jackson-databind-2.11.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-databind/2.11.0/8f3dba92b2f979fd859ce2eda9e1cf8bacf5cc91/jackson-databind-2.11.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-core/2.11.0/f84302e14648f9f63c0c73951054aeb2ff0b810a/jackson-core-2.11.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-core/2.11.0/db11b8a7990ea15aae03e842c42475771926ea5d/jackson-core-2.11.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-core/1.2.3/864344400c3d4d92dfeb0a305dc87d953677c03c/logback-core-1.2.3.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-core/1.2.3/3ebabe69eba0196af9ad3a814f723fb720b9101e/logback-core-1.2.3-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-annotations/2.11.0/c626020ae55d19c690d25cb51c1532ba76e5890f/jackson-annotations-2.11.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.core/jackson-annotations/2.11.0/1e90e40f81ac3a9b2f78061bea06c0a8606ddb8c/jackson-annotations-2.11.0-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.yaml/snakeyaml/1.26/a78a8747147d2c5807683e76ec2b633e95c14fe9/snakeyaml-1.26.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.yaml/snakeyaml/1.26/1f369166f21abc8c07e618c2b9c0897f405d0999/snakeyaml-1.26-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/isorelax/isorelax/20030108/b21859c352bd959ea22d06b2fe8c93b2e24531b9/isorelax-20030108.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant-apache-resolver/1.10.9/aaabfffa9c1631d09a08eb3bc1106607b497c4cf/ant-apache-resolver-1.10.9.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.ant/ant-apache-resolver/1.10.9/fa4ce30143422daa3ca13ef9efc50e1874262ba8/ant-apache-resolver-1.10.9-sources.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/nu.validator.htmlparser/htmlparser/1.4/70573d780fa08271499e201bbd86caa3c62f20e1/htmlparser-1.4.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/nu.validator.htmlparser/htmlparser/1.4/7703abdb7fba3ed993330e5d3aac163268f69e15/htmlparser-1.4-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/junit/junit/4.12/2973d150c0dc1fefe998f834810d68f278ea58ec/junit-4.12.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/junit/junit/4.12/a6c32b40bf3d76eca54e3c601e5d1470c86fcdfa/junit-4.12-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.xmlunit/xmlunit-core/2.6.0/ed9bfba5c65a7162f6fbdaecb92f12b4c033ca9c/xmlunit-core-2.6.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.xmlunit/xmlunit-core/2.6.0/eb20a810d79c6e8fe3d5bb8604cb3efe0ee82aca/xmlunit-core-2.6.0-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.mockito/mockito-core/3.7.0/ccd43add1a3973f828441e2f7179253c0d87dc92/mockito-core-3.7.0.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.mockito/mockito-core/3.7.0/e5a999dae38e32d87b274d00433f29725e1bec68/mockito-core-3.7.0-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.hamcrest/hamcrest-core/1.3/42a25dc3219429f0e5d060061f71acb49bf010a0/hamcrest-core-1.3.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.hamcrest/hamcrest-core/1.3/1dc37250fbc78e23a65a67fbbaf71d2e9cbc3c0b/hamcrest-core-1.3-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy/1.10.19/7a8cf46cd99db76f02b335d53aad222d42bc412d/byte-buddy-1.10.19.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy/1.10.19/81af0dc225c651e1e15b2b53de8d5493e40df834/byte-buddy-1.10.19-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.10.19/6453928a03a95dc23d7ef120cfd58f4539c64b53/byte-buddy-agent-1.10.19.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.10.19/3ada9075b7fdc9fc96ba4ffdb0be08003310d8c1/byte-buddy-agent-1.10.19-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.objenesis/objenesis/3.1/48f12deaae83a8dfc3775d830c9fd60ea59bbbca/objenesis-3.1.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.objenesis/objenesis/3.1/36e4b278b98654980a51e36ef60b186a757ed3d7/objenesis-3.1-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-pdf-images/2.5/700918a229ae25caeaf78d17c001f21f162ca0d6/fop-pdf-images-2.5.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-pdf-images/2.5/a58501df24a2b07e33ca9d9ae5dc150cb19acc33/fop-pdf-images-2.5-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop/2.5/3d4b79dcd8a2cb39aabc71a37fac4457c48c750c/fop-2.5.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-core/2.5/69978fa00a4060868c4e4f83605e8aca2c1a1902/fop-core-2.5.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-core/2.5/5bb61a24a765f4a08acfa717f3d652070cb6693a/fop-core-2.5-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-events/2.5/1b64940cddcb585d531c520db2557a59282343f1/fop-events-2.5.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-events/2.5/f530d63e50e6555f9475aab09f4dcdea4e6e0970/fop-events-2.5-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-util/2.5/997005cd8ce6ff6e59ab85e9b36d919f8d723aa4/fop-util-2.5.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/fop-util/2.5/d8c13c580301df3308296965826ff99d4ec83378/fop-util-2.5-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-all/1.13/b2b05df4bbe65d2bedb5f675d8eaa490a7577a03/batik-all-1.13.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-rasterizer-ext/1.13/451de768d33a76f74c50492412ffa46ff30c58aa/batik-rasterizer-ext-1.13.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-rasterizer/1.13/2377ed2b69069bd5c53a52eb055108667b4183e/batik-rasterizer-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-rasterizer/1.13/f613f24c3cc2aecead94a6f49ea46a1f2f30fb29/batik-rasterizer-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgrasterizer/1.13/b4892e196ec5d829478f22c3a8d9c2321c2daa40/batik-svgrasterizer-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgrasterizer/1.13/12ac55f5b373eb19d8655c30a0a696430f1a648b/batik-svgrasterizer-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-codec/1.13/635aa7b508dd7ab1bc2c4bec61e5e87d96a87f12/batik-codec-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-codec/1.13/a0f2b121905862c71bf148c6ad0800e029b32840/batik-codec-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-squiggle-ext/1.13/234c427f67925208012894f7195b80a066440c5f/batik-squiggle-ext-1.13.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-extension/1.13/92f42a0cbda28d920116bb0648d2d2eecabdd19/batik-extension-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-extension/1.13/c5921d3db10171e6b836c94f3958f56ce6df7aaf/batik-extension-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-slideshow/1.13/4d6ada95bcd8173f6df31a5ed85ecc84f33fb580/batik-slideshow-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-slideshow/1.13/42afe274b17bc1cac3c2ea7db34c2dab33a5d09d/batik-slideshow-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-squiggle/1.13/ea736a9768c4e9b842023e2107a965870dccbdd7/batik-squiggle-1.13.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgbrowser/1.13/279a07410db28fdb3d819c148fe8fb7e10ee10a7/batik-svgbrowser-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgbrowser/1.13/8b4e0d8f1faef39043acc3824a8924d505070353/batik-svgbrowser-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-swing/1.13/232653b04333483431cce9cdece2978fc6577c27/batik-swing-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-swing/1.13/79bf8d495661569a435b12c9902d365903d2d9ad/batik-swing-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgpp/1.13/255118c63cc93ccfddc40a4472acab789f142d6a/batik-svgpp-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svgpp/1.13/6490afbb37bef6077cd02e5e797304ab7c9ac910/batik-svgpp-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-transcoder/1.13/c315cbb6cc7a809c18995ae84f37c087b6f71fb3/batik-transcoder-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-transcoder/1.13/5085cca8e2f670b9d33c1fe4cefc7f159eebbc88/batik-transcoder-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-bridge/1.13/fe5e35b253b859e6a0a67fe3595bc8c3ad6faa52/batik-bridge-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-bridge/1.13/aa0a84b3676ad7482607c3fa922bf177002b8595/batik-bridge-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-script/1.13/4579ef2a459f3574bd85236892c6af9c4d821ef0/batik-script-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-script/1.13/f92b98c387beb6ad5878902ebf53be8914ba157/batik-script-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-anim/1.13/a5d06a4fbaf9cf2015c76d95d9a5dcf3a5bcf9e2/batik-anim-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-anim/1.13/17fd8a3d1004c238c1f98e4d53a43e318f067960/batik-anim-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-gvt/1.13/e324b1b5bb23649c67579b8c2ee45f33de42e539/batik-gvt-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-gvt/1.13/3231a02d1cf6423bd7e83ae67c42758b35718019/batik-gvt-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svg-dom/1.13/ad16f601df77e9230a5a6a78ec7bfaf3ee2767d4/batik-svg-dom-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svg-dom/1.13/90cd2219af704c268a65d4162d65cc3f477e703a/batik-svg-dom-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-parser/1.13/33169dfb1155b76705b8640a1aa9a222564b3a62/batik-parser-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-parser/1.13/7e7cb18bce7e946c615067ef4e42bc61030cf0da/batik-parser-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-ttf2svg/1.13/70d2b5b9b2f253d6a89e208e7bb8d9658ac61f46/batik-ttf2svg-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-ttf2svg/1.13/929cbe6129430dd3d63cf0b9425a23a57be62cac/batik-ttf2svg-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svggen/1.13/aee02c61f8ed1a50db182a1974f0ef11166fcc01/batik-svggen-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-svggen/1.13/9abcad186b415959f3b4c9d479c13e2764fe1374/batik-svggen-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-awt-util/1.13/d6dca71c2e3e48901a5a3cab9477f0b7a7c53c8/batik-awt-util-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-awt-util/1.13/dc0f374953db040f59f69ed228bbdf4b9734b511/batik-awt-util-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-dom/1.13/818605a4cffadb5ec0db39b2f560c2206d65f691/batik-dom-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-dom/1.13/cb8ceeb902b4e5e9a99b7588b315e7445e27f4f/batik-dom-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-css/1.13/90d83f11998260ad0f7ac784f90181f41ccd5bcd/batik-css-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-css/1.13/e20801fb330799d23187c843e6509f575b382bfc/batik-css-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/xmlgraphics-commons/2.4/8d261df049a23d40a053d2700399ea76080fe0a8/xmlgraphics-commons-2.4.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/xmlgraphics-commons/2.4/21a2ad053f250db743ade3ea25719d77b98a7a70/xmlgraphics-commons-2.4-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/jcl-over-slf4j/1.7.30/cd92524ea19d27e5b94ecd251e1af729cffdfe15/jcl-over-slf4j-1.7.30.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/jcl-over-slf4j/1.7.30/f2442e369a190089a2774920b5e73a4d4c1ef793/jcl-over-slf4j-1.7.30-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.30/b5a4b6d16ab13e34a88fae84c35cd5d68cac922c/slf4j-api-1.7.30.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/1.7.30/71a1fdefa224da50f1db6306ce609981e20186c9/slf4j-api-1.7.30-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/xml-apis/xml-apis-ext/1.3.04/41a8b86b358e87f3f13cf46069721719105aff66/xml-apis-ext-1.3.04.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/pdfbox/2.0.21/64b4338c958658215b2341d1da24f0a71dc9c173/pdfbox-2.0.21.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/pdfbox/2.0.21/b83386468a0a9c7f925ea9b0004c19e4207374da/pdfbox-2.0.21-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-gui-util/1.13/a74a998205a316ff1ab2cab5240c9973de5fda69/batik-gui-util-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-gui-util/1.13/3acd0bb9f324b96ee36d7ae5b3cb2ca6fd5bce92/batik-gui-util-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-xml/1.13/1384efa56d6047a6d87e955a3a81a8e85061a74d/batik-xml-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-xml/1.13/7dd29ac4585d4f1a78cfe2743e322c7c984e26b/batik-xml-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-util/1.13/341818ceb5f7088c9ff5b35fac419ad9a74d8b6f/batik-util-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-util/1.13/c65bf2343dd9edaf23764cedae1cfac98ac2c58f/batik-util-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-constants/1.13/2778851f7c8e7023578e7b76c4e4f11e4b183a13/batik-constants-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-constants/1.13/4fb8a6e9187c35e1f0a2ed21be514bc1af3d6b5a/batik-constants-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-ext/1.13/ea55108b070051c5440613cfbbe91414010d183e/batik-ext-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-ext/1.13/98ba5f679ba87de03dd4ce2a158f98c067175bdd/batik-ext-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-i18n/1.13/e08aab4a78a5825144d7f1772356c0ee059a8d46/batik-i18n-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-i18n/1.13/b4ae66cff4ebdea9772eab9fc38d6ebe31d2fab1/batik-i18n-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/fontbox/2.0.21/cfe57349f27ee638660da802e34d0b1d68c84581/fontbox-2.0.21.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/fontbox/2.0.21/d967d08d998e70758b705ab6e1b83c594d6e0d9a/fontbox-2.0.21-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.2/4bfc12adfe4842bf07b657f0369c4cb522955686/commons-logging-1.2.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.2/ecf26c7507d67782a3bbd148d170b31dfad001aa/commons-logging-1.2-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.thoughtworks.qdox/qdox/1.12/466993f8362511ecc42e6508d3db1880bfcd5c56/qdox-1.12.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.thoughtworks.qdox/qdox/1.12/101da223f3150e7269e590178455bbffc3807a42/qdox-1.12-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/com.sun.media/jai-codec/1.1.3/34a67ba62097778e4695c951156bf189c2c8e016/jai-codec-1.1.3.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/javax.media/jai-core/1.1.3/b179d2efb1174658483e8b41bf4ac9d2eb5de438/jai-core-1.1.3.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-shared-resources/1.13/5b886d1a3327b1bf09e377d359c5d2392cccfed0/batik-shared-resources-1.13.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/org.apache.xmlgraphics/batik-shared-resources/1.13/b138fede83cd7aade16813f978b0b0c58ba8d0fc/batik-shared-resources-1.13-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/javax.servlet/servlet-api/2.2/1fd87c45d200f4877c8440ecaa399940925d90f1/servlet-api-2.2.jar" sourcepath="C:/Users/tiewhong/.gradle/caches/modules-2/files-2.1/javax.servlet/servlet-api/2.2/2b8664910b937aa77aaa388f2403ed019e37662e/servlet-api-2.2-sources.jar">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="gradle_used_by_scope" value="test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="bin/default"/>
+</classpath>
