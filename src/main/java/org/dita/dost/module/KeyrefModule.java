@@ -259,6 +259,17 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                 res.add(processTopic(f, rootScope, f.isResourceOnly));
             }
         }
+        
+        // Make hasKeyref ditamaps isInputResource 
+        for (ResolveTask rs : res) {
+        	if (rs.in != null) {
+        		final FileInfo f = job.getFileInfo(rs.in.uri);
+                if (f != null && f.hasKeyref && ATTR_FORMAT_VALUE_DITAMAP.equals(f.format)) {
+                    f.isInputResource = true;
+                    job.add(f);
+                }
+        	}
+        }
 
         if (fileInfoFilter != null) {
             return adjustResourceRenames(res.stream()
@@ -478,6 +489,10 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
     }
 
     private boolean isResourceOnly(final XdmNode elem) {
+    	if (MAP_RELCELL.matches(elem.getParent())) {
+    		return true;
+    	}
+    	
         return elem.select(ancestorOrSelf(Predicates.hasAttribute(ATTRIBUTE_NAME_PROCESSING_ROLE)).first()
                     .where(attributeEq(ATTRIBUTE_NAME_PROCESSING_ROLE, ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY)))
                 .exists();
