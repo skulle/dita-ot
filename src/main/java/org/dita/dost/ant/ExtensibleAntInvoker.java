@@ -352,13 +352,13 @@ public final class ExtensibleAntInvoker extends Task {
         } else {
             XMLUtils xmlUtils = project.getReference(ANT_REFERENCE_XML_UTILS);
             if (xmlUtils == null) {
-                project.log("XML utils not found from Ant project reference", Project.MSG_ERR);
+                project.log("XML utils not found from Ant project reference", Project.MSG_WARN);
                 xmlUtils = new XMLUtils();
                 xmlUtils.setLogger(new DITAOTAntLogger(project));
             }
             Store store = project.getReference(ANT_REFERENCE_STORE);
             if (store == null) {
-                project.log("Store not found from Ant project reference", Project.MSG_ERR);
+                project.log("Store not found from Ant project reference", Project.MSG_WARN);
                 store = new StreamStore(tempDir, xmlUtils);
             }
             project.log("Job not found from Ant project reference", Project.MSG_VERBOSE);
