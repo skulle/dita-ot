@@ -504,7 +504,9 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
      * @return key reference processing
      */
     private ResolveTask processTopic(final FileInfo f, final KeyScope scope, final boolean isResourceOnly) {
-        final int increment = isResourceOnly ? 0 : 1;
+        //EXM-47806(PRISMA_FM-10741) Possible patch, increment counters more eager for references to resource only topics.
+        boolean ditaFormat = f.format == null || "dita".equals(f.format);
+        final int increment = isResourceOnly && ! ditaFormat ? 0 : 1;
         final Integer used = usage.containsKey(f.uri) ? usage.get(f.uri) + increment : increment;
         usage.put(f.uri, used);
 
