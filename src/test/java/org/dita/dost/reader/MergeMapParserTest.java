@@ -7,6 +7,7 @@
  */
 package org.dita.dost.reader;
 
+import static javax.xml.XMLConstants.XMLNS_ATTRIBUTE;
 import static org.dita.dost.TestUtils.assertXMLEqual;
 import static org.dita.dost.util.Constants.*;
 
@@ -14,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import org.dita.dost.store.StreamStore;
 import org.dita.dost.util.XMLUtils;
@@ -40,7 +42,8 @@ public class MergeMapParserTest {
         parser.setLogger(new TestUtils.TestLogger());
         parser.setJob(new Job(srcDir, new StreamStore(srcDir, new XMLUtils())));
         final ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write("<wrapper>".getBytes(UTF8));
+        output.write(("<wrapper " + ATTRIBUTE_NAMESPACE_PREFIX_DITAARCHVERSION + "='" + DITA_NAMESPACE + "' "
+                + XMLNS_ATTRIBUTE + ":" + DITA_OT_NS_PREFIX + "='" + DITA_OT_NS + "'>").getBytes(StandardCharsets.UTF_8));
         parser.setOutputStream(output);
         parser.read(new File(srcDir, "test.ditamap").getAbsoluteFile(), srcDir.getAbsoluteFile());
         output.write("</wrapper>".getBytes(UTF8));
@@ -54,7 +57,8 @@ public class MergeMapParserTest {
         parser.setLogger(new TestUtils.TestLogger());
         parser.setJob(new Job(srcDir, new StreamStore(srcDir, new XMLUtils())));
         final ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write("<wrapper>".getBytes(UTF8));
+        output.write(("<wrapper " + ATTRIBUTE_NAMESPACE_PREFIX_DITAARCHVERSION + "='" + DITA_NAMESPACE + "' "
+                + XMLNS_ATTRIBUTE + ":" + DITA_OT_NS_PREFIX + "='" + DITA_OT_NS + "'>").getBytes(StandardCharsets.UTF_8));
         parser.setOutputStream(output);
         parser.read(new File(srcDir, "space in map name.ditamap").getAbsoluteFile(), srcDir.getAbsoluteFile());
         output.write("</wrapper>".getBytes(UTF8));
@@ -68,7 +72,8 @@ public class MergeMapParserTest {
         parser.setLogger(new TestUtils.TestLogger());
         parser.setJob(new Job(srcDir, new StreamStore(srcDir, new XMLUtils())));
         final ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write("<wrapper>".getBytes(UTF8));
+        output.write(("<wrapper " + ATTRIBUTE_NAMESPACE_PREFIX_DITAARCHVERSION + "='" + DITA_NAMESPACE + "' "
+                + XMLNS_ATTRIBUTE + ":" + DITA_OT_NS_PREFIX + "='" + DITA_OT_NS + "'>").getBytes(StandardCharsets.UTF_8));
         parser.setOutputStream(output);
         parser.read(new File(srcDir, "testcomposite.ditamap").getAbsoluteFile(), srcDir.getAbsoluteFile());
         output.write("</wrapper>".getBytes(UTF8));
@@ -83,7 +88,8 @@ public class MergeMapParserTest {
         parser.setLogger(new TestUtils.TestLogger());
         parser.setJob(new Job(srcDir, new StreamStore(srcDir, new XMLUtils())));
         final ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write("<wrapper>".getBytes(UTF8));
+        output.write(("<wrapper " + ATTRIBUTE_NAMESPACE_PREFIX_DITAARCHVERSION + "='" + DITA_NAMESPACE + "' "
+                + XMLNS_ATTRIBUTE + ":" + DITA_OT_NS_PREFIX + "='" + DITA_OT_NS + "'>").getBytes(StandardCharsets.UTF_8));
         parser.setOutputStream(output);
         parser.read(new File(srcDir, "testsubtopic.ditamap").getAbsoluteFile(), srcDir.getAbsoluteFile());
         output.write("</wrapper>".getBytes(UTF8));

@@ -4,7 +4,8 @@
  * Copyright 2004, 2005 IBM Corporation
  *
  * See the accompanying LICENSE file for applicable license.
-
+ *
+ * OXYGEN PATCH FOR EXM-48006 - Credits to Radu at oXygen
  */
 package org.dita.dost.reader;
 
@@ -32,6 +33,7 @@ import org.dita.dost.util.FileUtils;
 import org.dita.dost.util.Job;
 import org.dita.dost.util.Job.FileInfo;
 import org.dita.dost.util.MergeUtils;
+import org.dita.dost.util.URLUtils;
 import org.dita.dost.util.XMLUtils;
 
 import org.xml.sax.Attributes;
@@ -147,6 +149,7 @@ public final class MergeMapParser extends XMLFilterImpl {
 
     @Override
     public void endElement(final String uri, final String localName, final String qName) throws SAXException {
+    	skippedElemsStack.pop();
         if (processLevel > 0) {
             String value = processStack.peek();
             if (processLevel == processStack.size()) {
@@ -166,21 +169,46 @@ public final class MergeMapParser extends XMLFilterImpl {
             getContentHandler().characters(ch, start, length);
         }
     }
+    
+    @Override
+    public void endPrefixMapping(String prefix) throws SAXException {
+    	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+    	if(skippedElemsStack.isEmpty() || ! skippedElemsStack.peek()) {
+    		super.endPrefixMapping(prefix);
+    	}
+    }
+    
+    @Override
+    public void startPrefixMapping(String prefix, String uri) throws SAXException {
+    	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+    	if(skippedElemsStack.isEmpty() || ! skippedElemsStack.peek()) {
+    		super.startPrefixMapping(prefix, uri);
+    	}
+    }
 
+    //OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+    private Stack<Boolean> skippedElemsStack = new Stack<Boolean>();
+    
     @Override
     public void startElement(final String uri, final String localName, final String qName, final Attributes attributes) throws SAXException {
+    	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+    	skippedElemsStack.push(Boolean.FALSE);
         final String attrValue = attributes.getValue(ATTRIBUTE_NAME_PROCESSING_ROLE);
         if (attrValue != null) {
             processStack.push(attrValue);
             processLevel++;
             // @processing-role='resource-only'
             if (ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY.equals(attrValue)) {
+            	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+            	skippedElemsStack.set(skippedElemsStack.size() - 1, Boolean.TRUE);
                 return;
             }
         } else if (processLevel > 0) {
             processLevel++;
             // Child of @processing-role='resource-only'
             if (ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY.equals(processStack.peek())) {
+            	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
+            	skippedElemsStack.set(skippedElemsStack.size() - 1, Boolean.TRUE);
                 return;
             }
         }
@@ -198,7 +226,8 @@ public final class MergeMapParser extends XMLFilterImpl {
                     if (copyToValue != null && !copyToValue.toString().isEmpty()) {
                         attValue = copyToValue;
                     }
-                    final URI absTarget = dirPath.toURI().resolve(attValue);
+                    //OXYGEN PATCH FOR EXM-47106, proper dirpath conversion to URI
+                    final URI absTarget = URLUtils.toDirURI(dirPath).resolve(attValue);
                     XMLUtils.addOrSetAttribute(atts, ATTRIBUTE_NAME_OHREF, ohref.toString());
                     if (util.isVisited(absTarget)) {
                         attValue = toURI(SHARP + util.getIdValue(absTarget));
@@ -224,7 +253,8 @@ public final class MergeMapParser extends XMLFilterImpl {
                             }
                             XMLUtils.addOrSetAttribute(atts, ATTRIBUTE_NAME_FIRST_TOPIC_ID, firstTopicId.toString());
                         } else {
-                            final URI fileName = dirPath.toURI().resolve(attValue);
+                        	//OXYGEN PATCH FOR EXM-47106, proper dirpath conversion to URI
+                            final URI fileName = URLUtils.toDirURI(dirPath).resolve(attValue);
                             logger.error(MessageUtils.getMessage("DOTX008E", fileName.toString()).toString());
                         }
                     }
