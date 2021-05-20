@@ -173,7 +173,7 @@ public final class MergeMapParser extends XMLFilterImpl {
     @Override
     public void endPrefixMapping(String prefix) throws SAXException {
     	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
-    	if(!skippedElemsStack.isEmpty() && ! skippedElemsStack.peek()) {
+    	if(skippedElemsStack.isEmpty() || ! skippedElemsStack.peek()) {
     		super.endPrefixMapping(prefix);
     	}
     }
@@ -181,7 +181,7 @@ public final class MergeMapParser extends XMLFilterImpl {
     @Override
     public void startPrefixMapping(String prefix, String uri) throws SAXException {
     	//OXYGEN PATCH FOR EXM-48006, skip emitting events when the start element was ignored.
-    	if(!skippedElemsStack.isEmpty() && ! skippedElemsStack.peek()) {
+    	if(skippedElemsStack.isEmpty() || ! skippedElemsStack.peek()) {
     		super.startPrefixMapping(prefix, uri);
     	}
     }
