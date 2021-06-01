@@ -421,7 +421,7 @@ public class FilterUtils {
         if (MAPGROUP_D_KEYDEF.matches(attributes)) {        	
         	if(attributes.getValue(ATTRIBUTE_NAME_KEYS)==null||attributes.getValue(ATTRIBUTE_NAME_HREF)==null) {
         		if(attributes.getValue(ATTRIBUTE_NAME_KEYREF)==null) {
-        			throw new IllegalArgumentException("Attribute"+ATTRIBUTE_NAME_KEYREF+","+ATTRIBUTE_NAME_KEYS+" or "+ATTRIBUTE_NAME_HREF+" can not be null");
+        			logger.warn("Attribute"+ATTRIBUTE_NAME_KEYREF+","+ATTRIBUTE_NAME_KEYS+" or "+ATTRIBUTE_NAME_HREF+" can not be null");
         		}
         	}else {
         		Job.instance.addFilteredKey(attributes.getValue(ATTRIBUTE_NAME_KEYS), attributes.getValue(ATTRIBUTE_NAME_HREF));
