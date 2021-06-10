@@ -86,7 +86,7 @@ final public class ChunkModule extends AbstractPipelineModuleImpl {
         }
 
         final Map<URI, URI> changeTable = mapReader.getChangeTable();
-        if (hasChanges(changeTable)) {
+        if (hasChanges(changeTable) && !"xhtml-cr".equals(transtype)) {
             final Map<URI, URI> conflicTable = mapReader.getConflicTable();
             updateList(changeTable, conflicTable, mapReader);
             updateRefOfDita(changeTable, conflicTable);
