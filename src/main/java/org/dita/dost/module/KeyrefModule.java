@@ -391,6 +391,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                     ss.remove(null);
                     final QName rewriteAttrName = getReferenceAttribute(node);
                     final boolean isResourceOnly = isResourceOnly(node);
+                    final boolean isInRelTbl = MAP_RELCELL.matches(node.getParent());
                     node.select(attribute()).forEach(attr -> {
                         try {
                             if (Objects.equals(attr.getNodeName(), rewriteAttrName)) {
@@ -410,7 +411,7 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
                                                 hrefNode = value.toString();
                                             }
                                         } else {
-                                            final ResolveTask resolveTask = processTopic(fi, s, isResourceOnly);
+                                            final ResolveTask resolveTask = processTopic(fi, s, isResourceOnly, isInRelTbl);
                                             if(!scopeUriList.contains(resolveTask.scope.id+resolveTask.in.uri.toString())) {
                                                 scopeUriList.add(resolveTask.scope.id+resolveTask.in.uri.toString());
                                                 res.add(resolveTask);
@@ -489,13 +490,13 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
     }
 
     private boolean isResourceOnly(final XdmNode elem) {
-    	if (MAP_RELCELL.matches(elem.getParent())) {
-    		return true;
-    	}
-    	
         return elem.select(ancestorOrSelf(Predicates.hasAttribute(ATTRIBUTE_NAME_PROCESSING_ROLE)).first()
                     .where(attributeEq(ATTRIBUTE_NAME_PROCESSING_ROLE, ATTR_PROCESSING_ROLE_VALUE_RESOURCE_ONLY)))
                 .exists();
+    }
+    
+    private ResolveTask processTopic(final FileInfo f, final KeyScope scope, final boolean isResourceOnly) {
+    	return processTopic(f, scope, isResourceOnly, false);
     }
 
     /**
@@ -503,10 +504,10 @@ final class KeyrefModule extends AbstractPipelineModuleImpl {
      *
      * @return key reference processing
      */
-    private ResolveTask processTopic(final FileInfo f, final KeyScope scope, final boolean isResourceOnly) {
+    private ResolveTask processTopic(final FileInfo f, final KeyScope scope, final boolean isResourceOnly, final boolean isInRelTbl) {
         //EXM-47806(PRISMA_FM-10741) Possible patch, increment counters more eager for references to resource only topics.
         boolean ditaFormat = f.format == null || "dita".equals(f.format);
-        final int increment = isResourceOnly && ! ditaFormat ? 0 : 1;
+        final int increment = (isResourceOnly && ! ditaFormat) || isInRelTbl ? 0 : 1;
         final Integer used = usage.containsKey(f.uri) ? usage.get(f.uri) + increment : increment;
         usage.put(f.uri, used);
 
